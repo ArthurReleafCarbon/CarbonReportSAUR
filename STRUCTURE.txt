@@ -1,0 +1,78 @@
+carbonReportSAUR/
+│
+├── 📚 Documentation
+│   ├── README.md                  Documentation utilisateur complète
+│   ├── QUICKSTART.md              Guide de démarrage rapide (3 étapes)
+│   ├── INSTRUCTIONS.md            Instructions pour ajouter vos fichiers
+│   ├── PROJET_TERMINE.md          Récapitulatif complet du projet
+│   └── STRUCTURE.txt              Ce fichier
+│
+├── 🔧 Configuration
+│   ├── requirements.txt           Dépendances Python
+│   ├── .gitignore                 Configuration Git
+│   └── check_setup.py             ✅ Script de vérification
+│
+├── 🎨 Application
+│   └── app.py                     🚀 Application Streamlit principale
+│
+├── 💻 Code source (src/)
+│   ├── __init__.py
+│   ├── excel_loader.py            📥 Chargement et validation Excel
+│   ├── tree.py                    🌳 Arborescence ORG/LOT/ENT
+│   ├── calc_emissions.py          📊 Calculs émissions BRUT/NET
+│   ├── calc_indicators.py         📈 Calculs indicateurs
+│   ├── content_catalog.py         📖 Catalogue TEXTE_RAPPORT
+│   ├── chart_generators.py        📊 Générateurs graphiques matplotlib
+│   ├── table_generators.py        📋 Générateurs tableaux Word
+│   ├── kpi_calculators.py         🔢 Calculs KPI et équivalents
+│   ├── word_renderer.py           📝 Moteur de rendu Word
+│   └── word_blocks.py             🔄 Gestion blocs répétables
+│
+├── 📄 Templates Word (templates/)
+│   └── rapport_template.docx      ⚠️  À AJOUTER PAR VOUS
+│
+├── 🖼️  Assets (assets/)
+│   ├── logo_org.png               ⚠️  À AJOUTER PAR VOUS
+│   ├── digesteur_schema.png       ⚠️  À AJOUTER PAR VOUS
+│   └── icones/                    📁 Icônes optionnelles
+│
+└── 📦 Output (output/)
+    └── [Rapports générés]         📄 Rapports Word générés
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ MODULES CRÉÉS : 18 fichiers
+   • 10 modules Python dans src/
+   • 1 application Streamlit (app.py)
+   • 1 script de vérification (check_setup.py)
+   • 4 fichiers de documentation
+   • 2 fichiers de configuration
+
+⚠️  À AJOUTER PAR VOUS :
+   • Template Word dans templates/
+   • Logo dans assets/
+   • Schéma digesteur dans assets/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 DÉMARRAGE RAPIDE :
+
+1. Vérifier l'installation :
+   python check_setup.py
+
+2. Ajouter vos fichiers :
+   cp votre_template.docx templates/rapport_template.docx
+   cp votre_logo.png assets/logo_org.png
+   cp votre_schema.png assets/digesteur_schema.png
+
+3. Lancer l'application :
+   streamlit run app.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 POUR EN SAVOIR PLUS :
+   • Démarrage rapide : cat QUICKSTART.md
+   • Documentation complète : cat README.md
+   • État du projet : cat PROJET_TERMINE.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

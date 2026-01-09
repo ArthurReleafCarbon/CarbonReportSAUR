@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Streamlit
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files
+*.xlsx
+!template_example.xlsx
+*.xls
+*.docx
+!templates/*.docx
+
+# Generated files
+output/
+exports/
+overrides.json
+
+# OS
+.DS_Store
+Thumbs.db
