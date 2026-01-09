@@ -1,6 +1,25 @@
 # 🚀 Démarrage rapide - Carbon Report Generator
 
-## En 3 étapes
+## 🧪 Test rapide (recommandé pour débuter)
+
+**Testez la génération sans passer par Streamlit :**
+
+```bash
+# Tester avec votre fichier Excel
+python tests/test_generation_rapport.py votre_fichier.xlsx 2024
+```
+
+✅ Rapport généré dans : `tests/output/rapport_test.docx`
+✅ Très rapide pour itérer sur votre template
+✅ Pas besoin de l'interface Streamlit
+
+➡️ **Voir [tests/README.md](tests/README.md) pour plus de détails**
+
+---
+
+## 📱 Application complète (Streamlit)
+
+### En 3 étapes
 
 ### 1️⃣ Vérifier l'installation
 

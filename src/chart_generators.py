@@ -48,7 +48,7 @@ class ChartGenerator:
         elif chart_key == 'chart_contrib_lot':
             return self.generate_lot_contribution(data, **kwargs)
         elif chart_key == 'chart_emissions_total_org':
-            return self.generate_total_emissions_bar(data, **kwargs)
+            return self.generate_total_emissions_pie(data, **kwargs)
         elif chart_key == 'chart_emissions_elec_org':
             return self.generate_elec_emissions(data, **kwargs)
         elif chart_key == 'chart_batonnet_inter_lot_top3':
@@ -228,31 +228,48 @@ class ChartGenerator:
 
         return img_buffer
 
-    def generate_total_emissions_bar(self, emission_result: EmissionResult, **kwargs) -> Optional[BytesIO]:
+    def generate_total_emissions_pie(self, emission_result: EmissionResult,
+                                     poste_labels: dict = None, **kwargs) -> Optional[BytesIO]:
         """
-        Graphique bar des émissions totales par scope.
+        Graphique PIE de la contribution de chaque poste L1 au niveau ORG.
 
         Args:
-            emission_result: Résultat d'émissions
+            emission_result: Résultat d'émissions ORG
+            poste_labels: Dictionnaire {code: label}
 
         Returns:
             Image PNG en BytesIO
         """
-        scopes = ['Scope 1', 'Scope 2', 'Scope 3']
-        values = [
-            emission_result.scope1_tco2e,
-            emission_result.scope2_tco2e,
-            emission_result.scope3_tco2e
-        ]
+        if not emission_result.emissions_by_poste:
+            return None
 
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=self.dpi)
-        x_pos = np.arange(len(scopes))
-        colors = ['#2E86AB', '#A23B72', '#F18F01']
-        ax.bar(x_pos, values, color=colors)
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(scopes)
-        ax.set_ylabel('Émissions (tCO₂e)')
-        ax.set_title('Émissions totales par scope')
+        # Trier par valeur décroissante
+        sorted_postes = sorted(emission_result.emissions_by_poste.items(),
+                              key=lambda x: x[1], reverse=True)
+
+        # Prendre top 5 + regrouper le reste
+        if len(sorted_postes) <= 5:
+            labels = []
+            values = []
+            for code, value in sorted_postes:
+                label = poste_labels.get(code, code) if poste_labels else code
+                labels.append(label)
+                values.append(value)
+        else:
+            labels = []
+            values = []
+            for code, value in sorted_postes[:5]:
+                label = poste_labels.get(code, code) if poste_labels else code
+                labels.append(label)
+                values.append(value)
+            # Regrouper le reste
+            labels.append('Autres')
+            values.append(sum(v for _, v in sorted_postes[5:]))
+
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        ax.pie(values, labels=labels, autopct='%1.1f%%',
+               colors=self.colors[:len(values)], startangle=90)
+        ax.set_title('Contribution des postes - ORG')
 
         plt.tight_layout()
 
@@ -263,18 +280,41 @@ class ChartGenerator:
 
         return img_buffer
 
-    def generate_elec_emissions(self, data: pd.DataFrame, **kwargs) -> Optional[BytesIO]:
+    def generate_elec_emissions(self, emissions_by_activity: dict, **kwargs) -> Optional[BytesIO]:
         """
-        Graphique émissions électricité (placeholder).
+        Graphique PIE des émissions électricité par activité (EU vs AEP).
 
         Args:
-            data: Données émissions électricité
+            emissions_by_activity: Dict {activity: tco2e} pour le poste électricité
 
         Returns:
             Image PNG en BytesIO
         """
-        # TODO: À implémenter selon les données disponibles
-        return None
+        if not emissions_by_activity:
+            return None
+
+        # Filtrer les valeurs > 0
+        filtered = {k: v for k, v in emissions_by_activity.items() if v > 0}
+        if not filtered:
+            return None
+
+        labels = list(filtered.keys())
+        values = list(filtered.values())
+
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        colors = ['#2E86AB', '#A23B72']
+        ax.pie(values, labels=labels, autopct='%1.1f%%',
+               colors=colors[:len(values)], startangle=90)
+        ax.set_title('Répartition émissions Électricité par activité')
+
+        plt.tight_layout()
+
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight')
+        img_buffer.seek(0)
+        plt.close(fig)
+
+        return img_buffer
 
     def generate_inter_lot_top3(self, top_postes_data: List[tuple], **kwargs) -> Optional[BytesIO]:
         """

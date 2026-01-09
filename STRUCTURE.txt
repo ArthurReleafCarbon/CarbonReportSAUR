@@ -28,6 +28,14 @@ carbonReportSAUR/
 │   ├── word_renderer.py           📝 Moteur de rendu Word
 │   └── word_blocks.py             🔄 Gestion blocs répétables
 │
+├── 🧪 Tests (tests/)              ⭐ NOUVEAU !
+│   ├── __init__.py
+│   ├── test_generation_rapport.py ⚡ Test génération sans Streamlit
+│   ├── README.md                  📖 Documentation tests
+│   ├── RESUME_TEST.md             📊 Résumé du système de test
+│   ├── EXEMPLE_COMMANDE.sh        💡 Exemple d'utilisation
+│   └── output/                    📦 Rapports de test générés
+│
 ├── 📄 Templates Word (templates/)
 │   └── rapport_template.docx      ⚠️  À AJOUTER PAR VOUS
 │
@@ -37,15 +45,16 @@ carbonReportSAUR/
 │   └── icones/                    📁 Icônes optionnelles
 │
 └── 📦 Output (output/)
-    └── [Rapports générés]         📄 Rapports Word générés
+    └── [Rapports générés]         📄 Rapports Word générés (Streamlit)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ MODULES CRÉÉS : 18 fichiers
+✅ MODULES CRÉÉS : 22 fichiers (+4 nouveaux dans tests/)
    • 10 modules Python dans src/
    • 1 application Streamlit (app.py)
    • 1 script de vérification (check_setup.py)
-   • 4 fichiers de documentation
+   • 1 script de test (tests/test_generation_rapport.py) ⭐ NOUVEAU
+   • 5 fichiers de documentation
    • 2 fichiers de configuration
 
 ⚠️  À AJOUTER PAR VOUS :
@@ -57,21 +66,18 @@ carbonReportSAUR/
 
 🚀 DÉMARRAGE RAPIDE :
 
-1. Vérifier l'installation :
-   python check_setup.py
+1. Test rapide (recommandé) :
+   python tests/test_generation_rapport.py votre_fichier.xlsx 2024
+   → Rapport dans : tests/output/rapport_test.docx
 
-2. Ajouter vos fichiers :
-   cp votre_template.docx templates/rapport_template.docx
-   cp votre_logo.png assets/logo_org.png
-   cp votre_schema.png assets/digesteur_schema.png
-
-3. Lancer l'application :
+2. Application complète :
    streamlit run app.py
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📖 POUR EN SAVOIR PLUS :
-   • Démarrage rapide : cat QUICKSTART.md
+📖 DOCUMENTATION :
+   • Test rapide : cat tests/README.md
+   • Démarrage : cat QUICKSTART.md
    • Documentation complète : cat README.md
    • État du projet : cat PROJET_TERMINE.md
 

@@ -111,28 +111,35 @@ class WordRenderer:
         # Année
         replacements['{{annee}}'] = str(context.get('annee', '2024'))
 
-        # ORG
+        # ORG - AVEC FORMAT ESPACE ET ARRONDI
         org_result = context.get('org_result')
         if org_result:
             replacements['{{ORG_NAME}}'] = org_result.node_name
-            replacements['{{TOTAL_EMISSIONS}}'] = f"{org_result.total_tco2e:,.1f}"
-            replacements['{{TOTAL_EMISSIONS_S1}}'] = f"{org_result.scope1_tco2e:,.1f}"
-            replacements['{{TOTAL_EMISSIONS_S2}}'] = f"{org_result.scope2_tco2e:,.1f}"
-            replacements['{{TOTAL_EMISSIONS_S3}}'] = f"{org_result.scope3_tco2e:,.1f}"
-            replacements['{{pourc_s3_org}}'] = f"{org_result.get_scope_percentage(3):.1f}"
+            replacements['{{TOTAL_EMISSIONS}}'] = self.kpi_calc.format_number(org_result.total_tco2e)
+            replacements['{{TOTAL_EMISSIONS_S1}}'] = self.kpi_calc.format_number(org_result.scope1_tco2e)
+            replacements['{{TOTAL_EMISSIONS_S2}}'] = self.kpi_calc.format_number(org_result.scope2_tco2e)
+            replacements['{{TOTAL_EMISSIONS_S3}}'] = self.kpi_calc.format_number(org_result.scope3_tco2e)
+            replacements['{{pourc_s3_org}}'] = self.kpi_calc.format_number(org_result.get_scope_percentage(3))
 
-        # KPI globaux
-        kpi_1 = context.get('kpi_eu_1')
-        kpi_2 = context.get('kpi_eu_2')
-        replacements['{{kpi_EU_1}}'] = self.kpi_calc.format_kpi(kpi_1, 'kgCO₂e/m³')
-        replacements['{{kpi_EU_2}}'] = self.kpi_calc.format_kpi(kpi_2, 'kgCO₂e/m³')
+        # KPI m³ - NOUVEAUX NOMS
+        kpi_m3_eu = context.get('kpi_m3_eu')
+        kpi_m3_aep = context.get('kpi_m3_aep')
+        if kpi_m3_eu is not None:
+            replacements['{{kpi_M3_EU}}'] = f"{kpi_m3_eu:.2f} kgCO₂e/m³".replace(".", ",")
+        else:
+            replacements['{{kpi_M3_EU}}'] = "N/A"
 
-        # Équivalents
+        if kpi_m3_aep is not None:
+            replacements['{{kpi_M3_AEP}}'] = f"{kpi_m3_aep:.2f} kgCO₂e/m³".replace(".", ",")
+        else:
+            replacements['{{kpi_M3_AEP}}'] = "N/A"
+
+        # Équivalents - AVEC FORMAT ESPACE
         if org_result:
             flights = self.kpi_calc.calculate_flight_equivalent(org_result.total_tco2e)
             persons = self.kpi_calc.calculate_person_equivalent(org_result.total_tco2e)
-            replacements['{{kpi_1}}'] = f"{flights:,.0f}"
-            replacements['{{kpi_2}}'] = f"{persons:,.0f}"
+            replacements['{{kpi_1}}'] = self.kpi_calc.format_number(flights)
+            replacements['{{kpi_2}}'] = self.kpi_calc.format_number(persons)
 
         # Top postes ORG
         if org_result and org_result.top_postes:
@@ -233,25 +240,55 @@ class WordRenderer:
         if not org_result:
             return
 
-        # Générer et insérer les graphiques
+        poste_labels = context.get('poste_labels', {})
+        tree = context.get('tree')
+
+        # 1. Chart emissions scope (camembert scopes)
         charts = {
             '{{chart_emissions_scope_org}}': self.chart_gen.generate_scope_pie(org_result),
-            '{{chart_emissions_total_org}}': self.chart_gen.generate_total_emissions_bar(org_result),
         }
 
-        # Lot contribution si applicable
+        # 2. Chart emissions total (PIE des postes L1) - CORRIGÉ
+        charts['{{chart_emissions_total_org}}'] = self.chart_gen.generate_total_emissions_pie(
+            org_result, poste_labels=poste_labels
+        )
+
+        # 3. Chart contribution LOT (bar chart)
         lot_results = context.get('lot_results', {})
-        if lot_results:
-            lot_data = []
-            for key, result in lot_results.items():
-                if result.activity is None:  # Totaux LOT
-                    lot_data.append((result.node_name, result.total_tco2e))
-            if lot_data:
+        if lot_results and tree and tree.has_lots():
+            # Pour chaque LOT, sommer EU + AEP
+            lot_totals = {}
+            for lot in tree.get_lots():
+                total = 0.0
+                for activity in ['EU', 'AEP']:
+                    key = f"LOT_{lot.node_id}_{activity}"
+                    if key in lot_results:
+                        total += lot_results[key].total_tco2e
+                if total > 0:
+                    lot_totals[lot.node_name] = total
+
+            if lot_totals:
+                lot_data = list(lot_totals.items())
                 charts['{{chart_contrib_lot}}'] = self.chart_gen.generate_lot_contribution(lot_data)
 
-        # Top 3 inter-lot
+        # 4. Chart électricité par activité (PIE EU vs AEP) - NOUVEAU
+        # Chercher le poste "électricité" dans les données
+        elec_by_activity = {}
+        for key, result in lot_results.items():
+            if result.activity in ['EU', 'AEP']:
+                # Chercher le poste électricité
+                for poste_code, tco2e in result.emissions_by_poste.items():
+                    # Adapter selon le nom exact du poste électricité dans ton Excel
+                    if 'ELEC' in poste_code.upper() or 'ELECTRICITE' in poste_labels.get(poste_code, '').upper():
+                        if result.activity not in elec_by_activity:
+                            elec_by_activity[result.activity] = 0.0
+                        elec_by_activity[result.activity] += tco2e
+
+        if elec_by_activity:
+            charts['{{chart_emissions_elec_org}}'] = self.chart_gen.generate_elec_emissions(elec_by_activity)
+
+        # 5. Top 3 inter-lot (bar chart)
         if org_result.top_postes:
-            poste_labels = context.get('poste_labels', {})
             top_data = [(poste_labels.get(code, code), value)
                        for code, value in org_result.top_postes[:3]]
             charts['{{chart_batonnet_inter_lot_top3}}'] = self.chart_gen.generate_inter_lot_top3(top_data)

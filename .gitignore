@@ -29,6 +29,8 @@ ENV/
 output/
 exports/
 overrides.json
+tests/output/*.docx
+temp_upload.xlsx
 
 # OS
 .DS_Store

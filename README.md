@@ -39,12 +39,33 @@ pip install -r requirements.txt
 │   ├── digesteur_schema.png
 │   └── icones/
 ├── output/                   # Rapports générés
+├── tests/                    # 🧪 Scripts de test
+│   ├── test_generation_rapport.py  # Test génération sans Streamlit
+│   └── output/               # Rapports de test
 ├── app.py                    # Application Streamlit principale
 ├── requirements.txt          # Dépendances Python
 └── README.md                 # Cette documentation
 ```
 
 ## Démarrage rapide
+
+### Mode 1 : Test rapide (sans Streamlit)
+
+**Pour tester rapidement la génération de rapport :**
+
+```bash
+# Tester avec votre fichier Excel
+python tests/test_generation_rapport.py votre_fichier.xlsx 2024
+
+# Le rapport sera dans : tests/output/rapport_test.docx
+```
+
+✅ **Avantages** : Très rapide, parfait pour itérer sur le template
+⚠️ **Limites** : Pas de renommage ni d'exclusion de postes (mode BRUT uniquement)
+
+➡️ **Voir [tests/README.md](tests/README.md) pour plus de détails**
+
+### Mode 2 : Application complète (Streamlit)
 
 ### 1. Préparer vos fichiers
 

@@ -3,7 +3,7 @@ Module de calcul des KPI et textes générés.
 Calcule les équivalents (vols, empreinte FR) et génère les textes de comparaison.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from .calc_emissions import EmissionResult
 from .calc_indicators import IndicatorResult
 
@@ -18,6 +18,26 @@ class KPICalculator:
     def __init__(self):
         """Initialise le calculateur."""
         pass
+
+    def format_number(self, value: float, decimals: int = 0) -> str:
+        """
+        Formate un nombre avec espace comme séparateur de milliers et arrondi.
+
+        Args:
+            value: Valeur à formater
+            decimals: Nombre de décimales (0 par défaut)
+
+        Returns:
+            Nombre formaté (ex: "19 445")
+        """
+        if decimals == 0:
+            # Arrondir à l'entier
+            rounded = round(value)
+            # Formater avec espace comme séparateur
+            return f"{rounded:,}".replace(",", " ")
+        else:
+            # Avec décimales
+            return f"{value:,.{decimals}f}".replace(",", " ")
 
     def calculate_flight_equivalent(self, total_tco2e: float) -> float:
         """
@@ -43,62 +63,76 @@ class KPICalculator:
         """
         return total_tco2e / self.CO2_PER_PERSON_YEAR_FR
 
-    def calculate_kpi_eu_1(self, emission_result: EmissionResult,
-                          indicator_result: Optional[IndicatorResult]) -> Optional[float]:
+    def sum_volumes_by_activity(self, indicator_results: List[IndicatorResult],
+                                  indicator_code: str) -> float:
         """
-        Calcule le KPI EU 1 : kgCO2e/m³ eau épurée.
+        Somme tous les volumes pour un indicator_code donné.
 
         Args:
-            emission_result: Résultat d'émissions EU
-            indicator_result: Résultat d'indicateurs EU (contient volume eau épurée)
+            indicator_results: Liste de résultats d'indicateurs
+            indicator_code: Code de l'indicateur à sommer
+
+        Returns:
+            Volume total
+        """
+        total_volume = 0.0
+        for result in indicator_results:
+            indicator = result.get_indicator(indicator_code)
+            if indicator:
+                total_volume += indicator.value
+        return total_volume
+
+    def calculate_kpi_m3_eu(self, emission_result: EmissionResult,
+                            indicator_results: List[IndicatorResult]) -> Optional[float]:
+        """
+        Calcule le KPI EU : kgCO2e/m³ eau épurée.
+        Somme TOUS les volumes EU de tous les périmètres.
+
+        Args:
+            emission_result: Résultat d'émissions EU (total)
+            indicator_results: Liste de TOUS les résultats d'indicateurs EU
 
         Returns:
             KPI en kgCO2e/m³ ou None si pas de données
         """
-        if indicator_result is None:
+        if not indicator_results:
             return None
 
-        # Chercher l'indicateur de volume d'eau épurée
-        # (code à adapter selon le nom exact dans INDICATORS_REF)
-        volume_indicator = indicator_result.get_indicator('VOL_EAU_EPUREE')
-        if volume_indicator is None:
-            return None
+        # Sommer TOUS les volumes d'eau épurée
+        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_EPUREE')
 
-        volume_m3 = volume_indicator.value
-        if volume_m3 == 0:
+        if total_volume_m3 == 0:
             return None
 
         # Convertir tCO2e en kgCO2e
         kg_co2e = emission_result.total_tco2e * 1000
-        return kg_co2e / volume_m3
+        return kg_co2e / total_volume_m3
 
-    def calculate_kpi_eu_2(self, emission_result: EmissionResult,
-                          indicator_result: Optional[IndicatorResult]) -> Optional[float]:
+    def calculate_kpi_m3_aep(self, emission_result: EmissionResult,
+                             indicator_results: List[IndicatorResult]) -> Optional[float]:
         """
-        Calcule le KPI AEP 1 : kgCO2e/m³ eau distribuée.
+        Calcule le KPI AEP : kgCO2e/m³ eau distribuée.
+        Somme TOUS les volumes AEP de tous les périmètres.
 
         Args:
-            emission_result: Résultat d'émissions AEP
-            indicator_result: Résultat d'indicateurs AEP (contient volume eau distribuée)
+            emission_result: Résultat d'émissions AEP (total)
+            indicator_results: Liste de TOUS les résultats d'indicateurs AEP
 
         Returns:
             KPI en kgCO2e/m³ ou None si pas de données
         """
-        if indicator_result is None:
+        if not indicator_results:
             return None
 
-        # Chercher l'indicateur de volume d'eau distribuée
-        volume_indicator = indicator_result.get_indicator('VOL_EAU_DISTRIBUEE')
-        if volume_indicator is None:
-            return None
+        # Sommer TOUS les volumes d'eau distribuée
+        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_DISTRIBUEE')
 
-        volume_m3 = volume_indicator.value
-        if volume_m3 == 0:
+        if total_volume_m3 == 0:
             return None
 
         # Convertir tCO2e en kgCO2e
         kg_co2e = emission_result.total_tco2e * 1000
-        return kg_co2e / volume_m3
+        return kg_co2e / total_volume_m3
 
     def generate_activity_volume_comparison_text(self,
                                                  eu_result: Optional[EmissionResult],
