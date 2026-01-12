@@ -16,6 +16,8 @@ from pathlib import Path
 # Ajouter le dossier parent au path pour importer les modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from docx import Document
+
 from src.excel_loader import ExcelLoader, ExcelValidationError
 from src.tree import OrganizationTree
 from src.calc_emissions import EmissionCalculator, EmissionOverrides
@@ -23,6 +25,33 @@ from src.calc_indicators import IndicatorCalculator
 from src.content_catalog import ContentCatalog
 from src.kpi_calculators import KPICalculator
 from src.word_renderer import WordRenderer
+
+
+def _collect_doc_text(doc: Document) -> str:
+    """Récupère le texte des paragraphes et des cellules de tableau."""
+    chunks = []
+    for paragraph in doc.paragraphs:
+        if paragraph.text:
+            chunks.append(paragraph.text)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    if paragraph.text:
+                        chunks.append(paragraph.text)
+    return "\n".join(chunks)
+
+
+def _expected_activity_counts(tree: OrganizationTree) -> dict:
+    """Calcule le nombre d'occurrences attendu par activité."""
+    if not tree.has_lots():
+        return {activity: 1 for activity in tree.get_org_activities()}
+
+    counts = {}
+    for lot in tree.get_lots():
+        for activity in tree.get_lot_activities(lot.node_id):
+            counts[activity] = counts.get(activity, 0) + 1
+    return counts
 
 
 def test_generation_rapport(excel_path: str, output_path: str = None, annee: int = 2024):
@@ -220,6 +249,7 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
             'indicator_results': indicator_results,
             'content_catalog': content_catalog,
             'emissions_l2_df': data.get('EMISSIONS_L2'),
+            'emissions_df': data.get('EMISSIONS'),
             'tree': tree
         }
 
@@ -237,6 +267,26 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
 
         print(f"   ✅ Rapport généré : {output_path}")
         print()
+
+        # Vérifier la répétition LOT/ACTIVITY
+        doc_check = Document(str(output_path))
+        full_text = _collect_doc_text(doc_check)
+
+        assert '[[START_' not in full_text, "Marqueurs START encore présents dans le rapport"
+        assert '[[END_' not in full_text, "Marqueurs END encore présents dans le rapport"
+
+        lot_names = [lot.node_name for lot in lots]
+        missing_lots = [name for name in lot_names if name not in full_text]
+        assert not missing_lots, f"Lots manquants dans le rapport: {missing_lots}"
+
+        activity_labels = {"EU": "Eaux usées", "AEP": "Eau potable"}
+        expected_counts = _expected_activity_counts(tree)
+        for activity, expected in expected_counts.items():
+            label = activity_labels.get(activity)
+            if label:
+                needle = f"Activité – {label}"
+                found = full_text.count(needle)
+                assert found == expected, f"Activité {activity} attendue {expected}, trouvé {found}"
 
         # RÉSUMÉ
         print("=" * 70)

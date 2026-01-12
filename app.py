@@ -113,6 +113,7 @@ def load_excel_file(uploaded_file) -> bool:
 
             # Calculer les résultats BRUT
             st.session_state.results_brut = emission_calc.calculate_brut(top_n=4)
+            st.session_state.indicator_results = indicator_calc.calculate()
 
             # Supprimer le fichier temporaire
             temp_path.unlink()
@@ -351,6 +352,77 @@ def generate_report():
                 results = st.session_state.results_net or st.session_state.results_brut
                 overrides = st.session_state.overrides
 
+                # Calculer les KPI m³
+                kpi_calc = KPICalculator()
+                kpi_m3_eu = None
+                kpi_m3_aep = None
+
+                # Filtrer les résultats et indicateurs par activité
+                tree = st.session_state.tree
+                indicator_results_dict = st.session_state.indicator_results
+
+                # Collecter tous les résultats EU
+                eu_results_list = []
+                eu_indicators_list = []
+                for key, result in results.items():
+                    if '_EU' in key:
+                        eu_results_list.append(result)
+                    if key in indicator_results_dict:
+                        ind_result = indicator_results_dict[key]
+                        if ind_result.activity == 'EU':
+                            eu_indicators_list.append(ind_result)
+
+                # Collecter tous les résultats AEP
+                aep_results_list = []
+                aep_indicators_list = []
+                for key, result in results.items():
+                    if '_AEP' in key:
+                        aep_results_list.append(result)
+                    if key in indicator_results_dict:
+                        ind_result = indicator_results_dict[key]
+                        if ind_result.activity == 'AEP':
+                            aep_indicators_list.append(ind_result)
+
+                # Calculer le KPI EU global
+                if eu_results_list and eu_indicators_list:
+                    # Sommer toutes les émissions EU
+                    total_eu_tco2e = sum(r.total_tco2e for r in eu_results_list)
+                    # Créer un EmissionResult fictif avec le total
+                    from src.calc_emissions import EmissionResult
+                    eu_total_result = EmissionResult(
+                        node_id='ORG',
+                        node_name='ORG',
+                        activity='EU',
+                        total_tco2e=total_eu_tco2e,
+                        scope1_tco2e=sum(r.scope1_tco2e for r in eu_results_list),
+                        scope2_tco2e=sum(r.scope2_tco2e for r in eu_results_list),
+                        scope3_tco2e=sum(r.scope3_tco2e for r in eu_results_list),
+                        emissions_by_poste={},
+                        top_postes=[],
+                        other_postes=[]
+                    )
+                    kpi_m3_eu = kpi_calc.calculate_kpi_m3_eu(eu_total_result, eu_indicators_list)
+
+                # Calculer le KPI AEP global
+                if aep_results_list and aep_indicators_list:
+                    # Sommer toutes les émissions AEP
+                    total_aep_tco2e = sum(r.total_tco2e for r in aep_results_list)
+                    # Créer un EmissionResult fictif avec le total
+                    from src.calc_emissions import EmissionResult
+                    aep_total_result = EmissionResult(
+                        node_id='ORG',
+                        node_name='ORG',
+                        activity='AEP',
+                        total_tco2e=total_aep_tco2e,
+                        scope1_tco2e=sum(r.scope1_tco2e for r in aep_results_list),
+                        scope2_tco2e=sum(r.scope2_tco2e for r in aep_results_list),
+                        scope3_tco2e=sum(r.scope3_tco2e for r in aep_results_list),
+                        emissions_by_poste={},
+                        top_postes=[],
+                        other_postes=[]
+                    )
+                    kpi_m3_aep = kpi_calc.calculate_kpi_m3_aep(aep_total_result, aep_indicators_list)
+
                 context = {
                     'annee': annee,
                     'org_result': results.get('ORG'),
@@ -358,7 +430,14 @@ def generate_report():
                     'has_lots': st.session_state.tree.has_lots(),
                     'poste_labels': st.session_state.emission_calc.poste_labels,
                     'top_n': 4,
-                    'overrides': overrides
+                    'overrides': overrides,
+                    'emissions_df': st.session_state.excel_data.get('EMISSIONS'),
+                    'emissions_l2_df': st.session_state.excel_data.get('EMISSIONS_L2'),
+                    'content_catalog': st.session_state.content_catalog,
+                    'tree': st.session_state.tree,
+                    'indicator_results': st.session_state.indicator_results,
+                    'kpi_m3_eu': kpi_m3_eu,
+                    'kpi_m3_aep': kpi_m3_aep
                 }
 
                 # Générer le rapport

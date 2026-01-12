@@ -44,7 +44,8 @@ class ContentCatalog:
     SUPPORTED_CHART_KEYS = {
         'TRAVAUX_BREAKDOWN',
         'FILE_EAU_BREAKDOWN',
-        'EM_INDIRECTES_SPLIT'
+        'EM_INDIRECTES_SPLIT',
+        'REACTIF_BREAKDOWN'
     }
 
     SUPPORTED_TABLE_KEYS = {

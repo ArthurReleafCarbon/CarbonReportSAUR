@@ -99,7 +99,7 @@ class KPICalculator:
             return None
 
         # Sommer TOUS les volumes d'eau épurée
-        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_EPUREE')
+        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_EPURE')
 
         if total_volume_m3 == 0:
             return None
@@ -125,7 +125,7 @@ class KPICalculator:
             return None
 
         # Sommer TOUS les volumes d'eau distribuée
-        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_DISTRIBUEE')
+        total_volume_m3 = self.sum_volumes_by_activity(indicator_results, 'VOL_EAU_DISTRIB')
 
         if total_volume_m3 == 0:
             return None
@@ -155,14 +155,14 @@ class KPICalculator:
 
         # Volumes EU
         if eu_result and eu_indicators:
-            vol_epuree = eu_indicators.get_indicator('VOL_EAU_EPUREE')
+            vol_epuree = eu_indicators.get_indicator('VOL_EAU_EPURE')
             if vol_epuree:
                 lines.append(f"L'activité Assainissement a traité {vol_epuree.value:,.0f} {vol_epuree.unit} "
                            f"pour un total de {eu_result.total_tco2e:,.1f} tCO₂e.")
 
         # Volumes AEP
         if aep_result and aep_indicators:
-            vol_distribuee = aep_indicators.get_indicator('VOL_EAU_DISTRIBUEE')
+            vol_distribuee = aep_indicators.get_indicator('VOL_EAU_DISTRIB')
             if vol_distribuee:
                 lines.append(f"L'activité Eau Potable a distribué {vol_distribuee.value:,.0f} {vol_distribuee.unit} "
                            f"pour un total de {aep_result.total_tco2e:,.1f} tCO₂e.")
@@ -198,6 +198,59 @@ class KPICalculator:
             lines.append(f"{i}. **{label}** : {tco2e:,.1f} tCO₂e")
 
         return "\n".join(lines)
+
+    def calculate_kpi_m3_entity(self, emission_result: EmissionResult,
+                                indicator_result: IndicatorResult,
+                                activity: str) -> Optional[float]:
+        """
+        Calcule le KPI kgCO₂e/m³ pour une entité spécifique (LOT×ACTIVITÉ).
+
+        Args:
+            emission_result: Résultat d'émissions pour cette entité
+            indicator_result: Résultat d'indicateurs pour cette entité
+            activity: Activité (EU ou AEP)
+
+        Returns:
+            KPI en kgCO₂e/m³ ou None si pas de données
+        """
+        if not indicator_result:
+            return None
+
+        # Sélectionner le bon indicateur de volume selon l'activité
+        volume_code = 'VOL_EAU_EPURE' if activity == 'EU' else 'VOL_EAU_DISTRIB'
+        volume_indicator = indicator_result.get_indicator(volume_code)
+
+        if not volume_indicator or volume_indicator.value == 0:
+            return None
+
+        # Convertir tCO₂e en kgCO₂e
+        kg_co2e = emission_result.total_tco2e * 1000
+        return kg_co2e / volume_indicator.value
+
+    def calculate_kpi_hab_entity(self, emission_result: EmissionResult,
+                                 indicator_result: IndicatorResult) -> Optional[float]:
+        """
+        Calcule le KPI kgCO₂e/habitant pour une entité spécifique (LOT×ACTIVITÉ).
+
+        Args:
+            emission_result: Résultat d'émissions pour cette entité
+            indicator_result: Résultat d'indicateurs pour cette entité
+
+        Returns:
+            KPI en kgCO₂e/habitant ou None si pas de données
+        """
+        if not indicator_result:
+            return None
+
+        # Récupérer le nombre d'habitants desservis
+        hab_indicator = indicator_result.get_indicator('NB_HAB_DESSERVIS')
+
+        if not hab_indicator or hab_indicator.value == 0:
+            return None
+
+        # Convertir tCO₂e en kgCO₂e
+        kg_co2e = emission_result.total_tco2e * 1000
+        return kg_co2e / hab_indicator.value
 
     def format_kpi(self, value: Optional[float], unit: str, decimals: int = 2) -> str:
         """

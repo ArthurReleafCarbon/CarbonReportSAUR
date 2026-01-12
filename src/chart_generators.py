@@ -5,11 +5,13 @@ Supporte tous les CHART_KEY définis dans le brief.
 
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib import font_manager as fm
 matplotlib.use('Agg')  # Backend sans interface graphique
 import pandas as pd
 from io import BytesIO
 from typing import Optional, List
 import numpy as np
+from pathlib import Path
 
 from .calc_emissions import EmissionResult
 
@@ -20,9 +22,48 @@ class ChartGenerator:
     def __init__(self):
         """Initialise le générateur avec les styles par défaut."""
         # Style général
-        plt.style.use('seaborn-v0_8-darkgrid')
-        self.colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E', '#BC4B51']
+        plt.style.use('default')
+        self.colors = ['#0B3B2E', '#3F9B83', '#62CC7B', '#8AD2C5', '#CDEFE8', '#E9F7F4']
         self.dpi = 150
+        self._load_fonts()
+        plt.rcParams["axes.grid"] = False
+        plt.rcParams["axes.facecolor"] = "white"
+        plt.rcParams["figure.facecolor"] = "white"
+        self._pie_textprops = {
+            "fontproperties": self.body_font,
+            "fontweight": "bold",
+            "fontsize": plt.rcParams.get("font.size", 10) + 1
+        }
+
+    def _style_axes(self, ax):
+        """Applique un style sans cadres ni axes."""
+        ax.grid(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.tick_params(length=0)
+
+    def _pie_autopct(self, pct: float) -> str:
+        """Formatte les % de pie chart sans décimales."""
+        return f"{int(round(pct))}%"
+
+    def _load_fonts(self):
+        """Charge les polices Poppins pour les graphiques."""
+        font_dir = Path(__file__).resolve().parent.parent / "assets" / "police"
+        if font_dir.exists():
+            for font_path in font_dir.glob("*.ttf"):
+                try:
+                    fm.fontManager.addfont(str(font_path))
+                except Exception:
+                    pass
+
+        plt.rcParams["font.family"] = "Poppins"
+        plt.rcParams["font.weight"] = "normal"
+        plt.rcParams["mathtext.fontset"] = "custom"
+        plt.rcParams["mathtext.rm"] = "Poppins"
+        plt.rcParams["mathtext.it"] = "Poppins:italic"
+        plt.rcParams["mathtext.bf"] = "Poppins:bold"
+        self.title_font = fm.FontProperties(family="Poppins", weight="bold", size=12)
+        self.body_font = fm.FontProperties(family="Poppins", weight="normal")
 
     def generate_chart(self, chart_key: str, data: pd.DataFrame,
                       **kwargs) -> Optional[BytesIO]:
@@ -81,8 +122,9 @@ class ChartGenerator:
         ax.barh(y_pos, data['tco2e'], color=self.colors[:len(data)])
         ax.set_yticks(y_pos)
         ax.set_yticklabels(data['poste_l2'])
-        ax.set_xlabel('Émissions (tCO₂e)')
-        ax.set_title('Répartition des émissions - Travaux')
+        ax.set_xlabel('Émissions (tCO$_2$e)')
+        ax.set_title('Répartition des émissions - Travaux', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
         ax.invert_yaxis()  # Plus gros en haut
 
         plt.tight_layout()
@@ -112,9 +154,10 @@ class ChartGenerator:
 
         # Pie chart
         colors = ['#2E86AB', '#A23B72', '#F18F01']
-        ax.pie(data['tco2e'], labels=data['poste_l2'], autopct='%1.1f%%',
-               colors=colors[:len(data)], startangle=90)
-        ax.set_title('Répartition des émissions - File eau STEP')
+        ax.pie(data['tco2e'], labels=data['poste_l2'], autopct=self._pie_autopct,
+               textprops=self._pie_textprops, colors=colors[:len(data)], startangle=90)
+        ax.set_title('Répartition des émissions - File eau STEP', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -138,15 +181,27 @@ class ChartGenerator:
         if data.empty:
             return None
 
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
 
-        # Bar chart
-        x_pos = np.arange(len(data))
-        ax.bar(x_pos, data['tco2e'], color=self.colors[:len(data)])
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(data['poste_l2'], rotation=45, ha='right')
-        ax.set_ylabel('Émissions (tCO₂e)')
-        ax.set_title('Répartition des émissions indirectes')
+        # Pie chart (légende à droite, pas de labels autour du pie)
+        wedges, texts, autotexts = ax.pie(
+            data['tco2e'],
+            labels=None,
+            autopct=self._pie_autopct,
+            textprops=self._pie_textprops,
+            colors=self.colors[:len(data)],
+            startangle=90
+        )
+        ax.legend(
+            wedges,
+            data['poste_l2'],
+            loc='center left',
+            bbox_to_anchor=(1.05, 0.5),
+            frameon=False,
+            prop=self.body_font
+        )
+        ax.set_title('Répartition des émissions indirectes', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -183,9 +238,26 @@ class ChartGenerator:
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
         colors = ['#2E86AB', '#A23B72', '#F18F01']
-        ax.pie(values, labels=scopes, autopct='%1.1f%%', colors=colors[:len(values)],
-               startangle=90)
-        ax.set_title('Répartition par scope')
+        wedges, texts, autotexts = ax.pie(
+            values,
+            labels=None,
+            autopct=self._pie_autopct,
+            textprops=self._pie_textprops,
+            colors=self.colors[:len(values)],
+            startangle=90
+        )
+        for text in autotexts:
+            text.set_color("white")
+        ax.legend(
+            wedges,
+            scopes,
+            loc='center left',
+            bbox_to_anchor=(1.05, 0.5),
+            frameon=False,
+            prop=self.body_font
+        )
+        ax.set_title('Répartition par scope', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -216,8 +288,9 @@ class ChartGenerator:
         ax.bar(x_pos, values, color=self.colors[:len(names)])
         ax.set_xticks(x_pos)
         ax.set_xticklabels(names, rotation=45, ha='right')
-        ax.set_ylabel('Émissions (tCO₂e)')
-        ax.set_title('Contribution des LOTs')
+        ax.set_ylabel('Émissions (tCO$_2$e)')
+        ax.set_title('Contribution des LOTs', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -267,9 +340,10 @@ class ChartGenerator:
             values.append(sum(v for _, v in sorted_postes[5:]))
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
-        ax.pie(values, labels=labels, autopct='%1.1f%%',
-               colors=self.colors[:len(values)], startangle=90)
-        ax.set_title('Contribution des postes - ORG')
+        ax.pie(values, labels=labels, autopct=self._pie_autopct,
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+        ax.set_title('Contribution des postes - ORG', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -303,9 +377,10 @@ class ChartGenerator:
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
         colors = ['#2E86AB', '#A23B72']
-        ax.pie(values, labels=labels, autopct='%1.1f%%',
-               colors=colors[:len(values)], startangle=90)
-        ax.set_title('Répartition émissions Électricité par activité')
+        ax.pie(values, labels=labels, autopct=self._pie_autopct,
+               textprops=self._pie_textprops, colors=colors[:len(values)], startangle=90)
+        ax.set_title('Répartition émissions Électricité par activité', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -316,28 +391,103 @@ class ChartGenerator:
 
         return img_buffer
 
-    def generate_inter_lot_top3(self, top_postes_data: List[tuple], **kwargs) -> Optional[BytesIO]:
+    def generate_elec_emissions_by_lot(self, emissions_by_lot: dict, **kwargs) -> Optional[BytesIO]:
         """
-        Graphique bâtonnet inter-LOT top 3 postes.
+        Graphique PIE des émissions électricité par LOT.
 
         Args:
-            top_postes_data: Liste de tuples (poste_name, tco2e)
+            emissions_by_lot: Dict {lot_name: tco2e} pour le poste électricité
 
         Returns:
             Image PNG en BytesIO
         """
-        if not top_postes_data:
+        if not emissions_by_lot:
             return None
 
-        names, values = zip(*top_postes_data[:3])  # Top 3
+        # Filtrer les valeurs > 0
+        filtered = {k: v for k, v in emissions_by_lot.items() if v > 0}
+        if not filtered:
+            return None
 
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=self.dpi)
-        x_pos = np.arange(len(names))
-        ax.bar(x_pos, values, color=self.colors[:len(names)])
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(names, rotation=45, ha='right')
-        ax.set_ylabel('Émissions (tCO₂e)')
-        ax.set_title('Top 3 postes émetteurs')
+        labels = list(filtered.keys())
+        values = list(filtered.values())
+
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        ax.pie(values, labels=labels, autopct=self._pie_autopct,
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+        ax.set_title('Répartition émissions Électricité par LOT', fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
+
+        plt.tight_layout()
+
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight')
+        img_buffer.seek(0)
+        plt.close(fig)
+
+        return img_buffer
+
+    def generate_inter_lot_top3(self, top3_by_lot: dict, **kwargs) -> Optional[BytesIO]:
+        """
+        Graphique bâtonnet groupé: top 3 postes comparés entre LOTs.
+
+        Affiche une barre pour chaque LOT, regroupées par poste d'émission.
+
+        Args:
+            top3_by_lot: Dict {poste_name: {lot_name: tco2e}}
+
+        Returns:
+            Image PNG en BytesIO
+        """
+        if not top3_by_lot:
+            return None
+
+        # Extraire postes et LOTs
+        postes = list(top3_by_lot.keys())
+        all_lots = set()
+        for poste_lots in top3_by_lot.values():
+            all_lots.update(poste_lots.keys())
+        lots = sorted(list(all_lots))
+
+        if not lots or not postes:
+            return None
+
+        # Préparer les données pour chaque LOT
+        x = np.arange(len(postes))
+        width = 0.8 / len(lots)  # Largeur de chaque barre
+
+        fig, ax = plt.subplots(figsize=(12, 7), dpi=self.dpi)
+
+        # Tracer une barre pour chaque LOT
+        lot_colors = self.colors[:max(1, len(lots))]
+        for i, lot in enumerate(lots):
+            values = [top3_by_lot[poste].get(lot, 0) for poste in postes]
+            offset = width * i - (width * len(lots) / 2) + width / 2
+            bars = ax.bar(x + offset, values, width, label=lot,
+                          color=lot_colors[i % len(lot_colors)])
+
+            for bar, value in zip(bars, values):
+                if value <= 0:
+                    continue
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + (max(values) * 0.02 if max(values) else 1),
+                    f"{int(round(value)):,}".replace(",", " "),
+                    ha='center',
+                    va='bottom',
+                    color=lot_colors[i % len(lot_colors)],
+                    fontproperties=self.body_font
+                )
+
+        ax.set_xlabel('Poste d\'émission', fontproperties=self.body_font)
+        ax.set_ylabel('Émissions (tCO$_2$e)', fontproperties=self.body_font)
+        ax.set_title('Comparaison de l’impact entre lots – Postes\nmajeurs',
+                     fontproperties=self.title_font, pad=24)
+        ax.set_xticks(x)
+        ax.set_xticklabels(postes, rotation=0, ha='center', fontproperties=self.body_font)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+                  ncol=min(3, len(lots)), frameon=False)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
@@ -360,12 +510,14 @@ class ChartGenerator:
         """
         return self.generate_scope_pie(emission_result)
 
-    def generate_postes_pie_entity(self, emission_result: EmissionResult, **kwargs) -> Optional[BytesIO]:
+    def generate_postes_pie_entity(self, emission_result: EmissionResult,
+                                   poste_labels: dict = None, **kwargs) -> Optional[BytesIO]:
         """
         Camembert des postes pour LOT × ACTIVITÉ.
 
         Args:
             emission_result: Résultat d'émissions LOT×ACT
+            poste_labels: Dictionnaire {code: label}
 
         Returns:
             Image PNG en BytesIO
@@ -378,19 +530,110 @@ class ChartGenerator:
                              key=lambda x: x[1], reverse=True)
 
         if len(sorted_postes) <= 5:
-            labels = [p[0] for p in sorted_postes]
-            values = [p[1] for p in sorted_postes]
+            labels = []
+            values = []
+            for code, value in sorted_postes:
+                label = poste_labels.get(code, code) if poste_labels else code
+                labels.append(label)
+                values.append(value)
         else:
-            labels = [p[0] for p in sorted_postes[:5]] + ['Autres']
-            values = [p[1] for p in sorted_postes[:5]] + [sum(p[1] for p in sorted_postes[5:])]
+            labels = []
+            values = []
+            for code, value in sorted_postes[:5]:
+                label = poste_labels.get(code, code) if poste_labels else code
+                labels.append(label)
+                values.append(value)
+            # Regrouper le reste
+            labels.append('Autres')
+            values.append(sum(v for _, v in sorted_postes[5:]))
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
-        ax.pie(values, labels=labels, autopct='%1.1f%%',
-               colors=self.colors[:len(values)], startangle=90)
-        ax.set_title(f'Répartition par poste - {emission_result.node_name}')
+        ax.pie(values, labels=labels, autopct=self._pie_autopct,
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+        ax.set_title(f'Répartition par poste - {emission_result.node_name}',
+                     fontproperties=self.title_font, pad=20)
+        self._style_axes(ax)
 
         plt.tight_layout()
 
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight')
+        img_buffer.seek(0)
+        plt.close(fig)
+
+        return img_buffer
+
+    def generate_reactif_breakdown(self, df: pd.DataFrame) -> BytesIO:
+        """
+        Génère un graphique donut de répartition des réactifs.
+
+        Args:
+            df: DataFrame avec colonnes 'poste_l2' et 'tco2e'
+
+        Returns:
+            Buffer image PNG
+        """
+        if df is None or df.empty:
+            return None
+
+        # Grouper et sommer par poste_l2
+        grouped = df.groupby('poste_l2', as_index=False)['tco2e'].sum()
+        grouped = grouped.sort_values('tco2e', ascending=False)
+
+        # Calculer les pourcentages
+        total = grouped['tco2e'].sum()
+        if total == 0:
+            return None
+
+        grouped['percentage'] = (grouped['tco2e'] / total * 100).round(0).astype(int)
+
+        # Préparer les données pour le graphique
+        labels = grouped['poste_l2'].tolist()
+        sizes = grouped['tco2e'].tolist()
+        percentages = grouped['percentage'].tolist()
+
+        # Créer la figure
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        # Palette de couleurs (inspirée de l'image)
+        colors = ['#1b4d3e', '#2d8b6b', '#f4c542', '#e8a87c']
+        # Étendre la palette si nécessaire
+        while len(colors) < len(labels):
+            colors.append(f'#{hash(labels[len(colors)]) % 0xFFFFFF:06x}')
+
+        # Créer le donut
+        wedges, texts, autotexts = ax.pie(
+            sizes,
+            labels=None,  # Pas de labels sur le graphique
+            autopct=lambda pct: f'{int(pct)}%' if pct > 5 else '',
+            startangle=90,
+            colors=colors[:len(labels)],
+            wedgeprops={'width': 0.4, 'edgecolor': 'white', 'linewidth': 2},
+            textprops={'fontsize': 14, 'weight': 'bold', 'color': 'white'}
+        )
+
+        # Ajouter le titre
+        ax.set_title(
+            'Répartition de l\'empreinte - Zoom sur les réactifs',
+            fontsize=16,
+            weight='bold',
+            fontproperties=self.title_font,
+            pad=20
+        )
+
+        # Créer la légende à droite
+        legend_labels = [f"{label}" for label in labels]
+        ax.legend(
+            legend_labels,
+            loc='center left',
+            bbox_to_anchor=(1, 0.5),
+            fontsize=12,
+            frameon=False
+        )
+
+        plt.tight_layout()
+
+        # Sauvegarder dans un buffer
         img_buffer = BytesIO()
         plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight')
         img_buffer.seek(0)

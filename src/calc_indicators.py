@@ -106,6 +106,7 @@ class IndicatorCalculator:
                                activity: str) -> Optional[IndicatorResult]:
         """
         Calcule les indicateurs pour LOT × ACTIVITÉ.
+        Agrège les indicateurs de tous les ENT enfants du LOT.
 
         Args:
             lot_id: ID du LOT
@@ -115,11 +116,19 @@ class IndicatorCalculator:
         Returns:
             IndicatorResult ou None si pas d'indicateurs
         """
-        # Filtrer les indicateurs pour ce LOT et cette activité
-        mask = (self.indicators_df['node_id'] == lot_id) & \
-               (self.indicators_df['activity'] == activity)
+        # Récupérer tous les ENT enfants de ce LOT avec cette activité
+        ent_ids = self.tree.get_ent_ids_by_activity(lot_id, activity)
 
-        lot_indicators = self.indicators_df[mask]
+        if not ent_ids:
+            # Fallback : chercher directement par LOT (si données au niveau LOT)
+            mask = (self.indicators_df['node_id'] == lot_id) & \
+                   (self.indicators_df['activity'] == activity)
+            lot_indicators = self.indicators_df[mask]
+        else:
+            # Filtrer les indicateurs pour tous les ENT de ce LOT
+            mask = (self.indicators_df['node_id'].isin(ent_ids)) & \
+                   (self.indicators_df['activity'] == activity)
+            lot_indicators = self.indicators_df[mask]
 
         if len(lot_indicators) == 0:
             return None
@@ -130,8 +139,16 @@ class IndicatorCalculator:
             activity=activity
         )
 
+        # Grouper par indicator_code et sommer les valeurs
+        # (car plusieurs ENT peuvent contribuer au même indicateur)
+        grouped = lot_indicators.groupby('indicator_code').agg({
+            'value': 'sum',
+            'unit': 'first',  # Prendre la première unité (devrait être identique)
+            'comment': 'first'  # Prendre le premier commentaire
+        }).reset_index()
+
         # Ajouter chaque indicateur
-        for _, row in lot_indicators.iterrows():
+        for _, row in grouped.iterrows():
             indicator_code = row['indicator_code']
             info = self.indicator_info.get(indicator_code, {})
 

@@ -5,7 +5,6 @@ Gère la duplication de blocs [[START_XXX]] ... [[END_XXX]].
 
 import re
 from docx.document import Document
-from docx.oxml.xmlchemy import OxmlElement
 from copy import deepcopy
 from typing import List, Tuple, Optional
 
@@ -73,7 +72,7 @@ class BlockProcessor:
 
     def duplicate_block(self, start_idx: int, end_idx: int, n_copies: int) -> List[Tuple[int, int]]:
         """
-        Duplique un bloc n fois.
+        Duplique un bloc n fois AVEC ses marqueurs START et END.
 
         Args:
             start_idx: Index du paragraphe START
@@ -83,18 +82,23 @@ class BlockProcessor:
         Returns:
             Liste des tuples (start_idx, end_idx) pour chaque copie
         """
-        # Extraire le contenu du bloc
-        block_elements = self.extract_block_content(start_idx, end_idx)
+        paragraphs = list(self.doc.paragraphs)
+
+        # Extraire TOUS les éléments du bloc (START inclus, END inclus)
+        block_elements = []
+        for i in range(start_idx, end_idx + 1):
+            if i < len(paragraphs):
+                block_elements.append(paragraphs[i]._element)
 
         # Position d'insertion (après END_MARKER)
-        insert_after = self.doc.paragraphs[end_idx]._element
+        insert_after = paragraphs[end_idx]._element
 
         # Dupliquer n fois
         copies_indices = []
         current_insert_after = insert_after
 
         for copy_num in range(n_copies):
-            # Copier chaque élément
+            # Copier chaque élément (y compris START et END)
             for element in block_elements:
                 # Cloner l'élément
                 new_element = deepcopy(element)
@@ -134,6 +138,8 @@ class BlockProcessor:
             end_idx: Index de fin du bloc
             replacements: Dictionnaire {placeholder: valeur}
         """
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
         paragraphs = list(self.doc.paragraphs)
 
         for i in range(start_idx, end_idx + 1):
@@ -144,6 +150,10 @@ class BlockProcessor:
                 # Remplacer les placeholders
                 for placeholder, value in replacements.items():
                     text = text.replace(placeholder, str(value))
+
+                    # Forcer l'alignement à gauche pour les listes formatées
+                    if placeholder == '{{ENTITY_TOP_POSTES_LIST}}' and placeholder in paragraph.text:
+                        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
                 # Mettre à jour le texte si modifié
                 if text != paragraph.text:
