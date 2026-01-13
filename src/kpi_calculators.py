@@ -13,7 +13,7 @@ class KPICalculator:
 
     # Constantes pour les équivalences
     CO2_PER_FLIGHT_PARIS_NY = 1.75  # tCO2e par vol Paris-New York
-    CO2_PER_PERSON_YEAR_FR = 10.0  # tCO2e/an/personne en France (à ajuster)
+    CO2_PER_PERSON_YEAR_FR = 9.0  # tCO2e/an/personne en France
 
     def __init__(self):
         """Initialise le calculateur."""

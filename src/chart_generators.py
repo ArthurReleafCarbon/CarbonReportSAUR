@@ -664,8 +664,9 @@ class ChartGenerator:
             startangle=90,
             colors=colors[:len(labels)],
             wedgeprops={'width': 0.4, 'edgecolor': 'white', 'linewidth': 2},
-            textprops={'fontsize': 14, 'weight': 'bold', 'color': 'white'},
-            explode=explode
+            textprops={'fontsize': 10, 'weight': 'bold', 'color': 'white'},
+            explode=explode,
+            pctdistance=0.75  # Positionner les % au milieu de l'anneau (0.75 pour donut width=0.4)
         )
 
         # Ajouter le titre
