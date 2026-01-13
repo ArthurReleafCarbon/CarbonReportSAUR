@@ -276,6 +276,9 @@ class EmissionCalculator:
             sorted_postes = [(code, value) for code, value in sorted_postes
                            if overrides.is_poste_shown(code)]
 
+        # Filtrer les postes avec des émissions > 0
+        sorted_postes = [(code, value) for code, value in sorted_postes if value > 0]
+
         result.top_postes = sorted_postes[:top_n]
         result.other_postes = sorted_postes[top_n:]
 

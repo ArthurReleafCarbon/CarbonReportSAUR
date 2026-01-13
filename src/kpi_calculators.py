@@ -12,7 +12,7 @@ class KPICalculator:
     """Calculateur de KPI et textes générés."""
 
     # Constantes pour les équivalences
-    CO2_PER_FLIGHT_PARIS_NY = 1.0  # tCO2e par vol (à ajuster selon données réelles)
+    CO2_PER_FLIGHT_PARIS_NY = 1.75  # tCO2e par vol Paris-New York
     CO2_PER_PERSON_YEAR_FR = 10.0  # tCO2e/an/personne en France (à ajuster)
 
     def __init__(self):

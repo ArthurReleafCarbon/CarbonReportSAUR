@@ -152,10 +152,34 @@ class ChartGenerator:
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
 
-        # Pie chart
+        # Pie chart avec légende à droite et pourcentages à l'extérieur
         colors = ['#2E86AB', '#A23B72', '#F18F01']
-        ax.pie(data['tco2e'], labels=data['poste_l2'], autopct=self._pie_autopct,
-               textprops=self._pie_textprops, colors=colors[:len(data)], startangle=90)
+        explode = [0.05] * len(data)
+        wedges, texts, autotexts = ax.pie(
+            data['tco2e'],
+            labels=None,  # Pas de labels sur le graphique, on utilise la légende
+            autopct=self._pie_autopct,
+            textprops=self._pie_textprops,
+            colors=colors[:len(data)],
+            startangle=90,
+            explode=explode,
+            pctdistance=1.15  # Placer les pourcentages à l'extérieur
+        )
+
+        # Mettre les pourcentages en blanc pour meilleure lisibilité
+        for autotext in autotexts:
+            autotext.set_color('black')
+
+        # Ajouter la légende à droite
+        ax.legend(
+            wedges,
+            data['poste_l2'],
+            loc='center left',
+            bbox_to_anchor=(1.05, 0.5),
+            frameon=False,
+            prop=self.body_font
+        )
+
         ax.set_title('Répartition des émissions - File eau STEP', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
@@ -184,13 +208,15 @@ class ChartGenerator:
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
 
         # Pie chart (légende à droite, pas de labels autour du pie)
+        explode = [0.05] * len(data)
         wedges, texts, autotexts = ax.pie(
             data['tco2e'],
             labels=None,
             autopct=self._pie_autopct,
             textprops=self._pie_textprops,
             colors=self.colors[:len(data)],
-            startangle=90
+            startangle=90,
+            explode=explode
         )
         ax.legend(
             wedges,
@@ -236,15 +262,21 @@ class ChartGenerator:
 
         scopes, values = zip(*filtered_data)
 
+        # Couleurs pour les scopes (bleu clair, bleu moyen, bleu foncé)
+        scope_colors = ['#89CFF0', '#5B9BD5', '#4472C4']
+
+        # Créer l'explode pour ajouter de l'espace entre les morceaux
+        explode = [0.05] * len(values)
+
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
-        colors = ['#2E86AB', '#A23B72', '#F18F01']
         wedges, texts, autotexts = ax.pie(
             values,
             labels=None,
             autopct=self._pie_autopct,
             textprops=self._pie_textprops,
-            colors=self.colors[:len(values)],
-            startangle=90
+            colors=scope_colors[:len(values)],
+            startangle=90,
+            explode=explode
         )
         for text in autotexts:
             text.set_color("white")
@@ -256,7 +288,10 @@ class ChartGenerator:
             frameon=False,
             prop=self.body_font
         )
-        ax.set_title('Répartition par scope', fontproperties=self.title_font, pad=20)
+
+        # Utiliser le nom de l'organisation si disponible
+        org_name = kwargs.get('org_name', 'ORG')
+        ax.set_title(f'Répartition par scope - {org_name}', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
         plt.tight_layout()
@@ -270,7 +305,7 @@ class ChartGenerator:
 
     def generate_lot_contribution(self, lot_data: List[tuple], **kwargs) -> Optional[BytesIO]:
         """
-        Graphique contribution des LOTs.
+        Graphique contribution des LOTs (pie chart).
 
         Args:
             lot_data: Liste de tuples (lot_name, tco2e)
@@ -283,13 +318,28 @@ class ChartGenerator:
 
         names, values = zip(*lot_data)
 
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=self.dpi)
-        x_pos = np.arange(len(names))
-        ax.bar(x_pos, values, color=self.colors[:len(names)])
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(names, rotation=45, ha='right')
-        ax.set_ylabel('Émissions (tCO$_2$e)')
-        ax.set_title('Contribution des LOTs', fontproperties=self.title_font, pad=20)
+        # Créer le pie chart avec les mêmes couleurs que les autres graphiques
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        explode = [0.05] * len(names)
+
+        wedges, texts, autotexts = ax.pie(
+            values,
+            labels=names,
+            autopct=self._pie_autopct,
+            textprops=self._pie_textprops,
+            colors=self.colors[:len(names)],
+            startangle=90,
+            explode=explode
+        )
+
+        # Mettre les pourcentages en blanc et gras
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+
+        # Utiliser le nom de l'organisation si disponible
+        org_name = kwargs.get('org_name', 'ORG')
+        ax.set_title(f'Contribution des LOTs - {org_name}', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
         plt.tight_layout()
@@ -340,8 +390,9 @@ class ChartGenerator:
             values.append(sum(v for _, v in sorted_postes[5:]))
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
-               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
         ax.set_title('Contribution des postes - ORG', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
@@ -377,8 +428,9 @@ class ChartGenerator:
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
         colors = ['#2E86AB', '#A23B72']
+        explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
-               textprops=self._pie_textprops, colors=colors[:len(values)], startangle=90)
+               textprops=self._pie_textprops, colors=colors[:len(values)], startangle=90, explode=explode)
         ax.set_title('Répartition émissions Électricité par activité', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
@@ -413,8 +465,9 @@ class ChartGenerator:
         values = list(filtered.values())
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
-               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
         ax.set_title('Répartition émissions Électricité par LOT', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
@@ -548,8 +601,9 @@ class ChartGenerator:
             values.append(sum(v for _, v in sorted_postes[5:]))
 
         fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
-               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90)
+               textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
         ax.set_title(f'Répartition par poste - {emission_result.node_name}',
                      fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
@@ -602,6 +656,7 @@ class ChartGenerator:
             colors.append(f'#{hash(labels[len(colors)]) % 0xFFFFFF:06x}')
 
         # Créer le donut
+        explode = [0.05] * len(labels)
         wedges, texts, autotexts = ax.pie(
             sizes,
             labels=None,  # Pas de labels sur le graphique
@@ -609,7 +664,8 @@ class ChartGenerator:
             startangle=90,
             colors=colors[:len(labels)],
             wedgeprops={'width': 0.4, 'edgecolor': 'white', 'linewidth': 2},
-            textprops={'fontsize': 14, 'weight': 'bold', 'color': 'white'}
+            textprops={'fontsize': 14, 'weight': 'bold', 'color': 'white'},
+            explode=explode
         )
 
         # Ajouter le titre

@@ -1304,7 +1304,7 @@ class WordRenderer:
 
         # 1. Chart emissions scope (camembert scopes)
         charts = {
-            '{{chart_emissions_scope_org}}': self.chart_gen.generate_scope_pie(org_result),
+            '{{chart_emissions_scope_org}}': self.chart_gen.generate_scope_pie(org_result, org_name=org_result.node_name),
         }
 
         # 2. Chart emissions total (PIE des postes L1) - CORRIGÉ
@@ -1328,7 +1328,7 @@ class WordRenderer:
 
             if lot_totals:
                 lot_data = list(lot_totals.items())
-                charts['{{chart_contrib_lot}}'] = self.chart_gen.generate_lot_contribution(lot_data)
+                charts['{{chart_contrib_lot}}'] = self.chart_gen.generate_lot_contribution(lot_data, org_name=org_result.node_name)
 
         # 4. Chart électricité par LOT (PIE répartition par LOT)
         # Chercher le poste "électricité" et agréger par LOT

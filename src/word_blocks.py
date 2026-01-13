@@ -131,17 +131,18 @@ class BlockProcessor:
 
     def replace_in_block(self, start_idx: int, end_idx: int, replacements: dict):
         """
-        Remplace des placeholders dans un bloc.
+        Remplace des placeholders dans un bloc (paragraphes ET tableaux).
 
         Args:
-            start_idx: Index de début du bloc
-            end_idx: Index de fin du bloc
+            start_idx: Index de début du bloc (basé sur les paragraphes)
+            end_idx: Index de fin du bloc (basé sur les paragraphes)
             replacements: Dictionnaire {placeholder: valeur}
         """
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
         paragraphs = list(self.doc.paragraphs)
 
+        # 1. Remplacer dans les paragraphes
         for i in range(start_idx, end_idx + 1):
             if i < len(paragraphs):
                 paragraph = paragraphs[i]
@@ -164,6 +165,67 @@ class BlockProcessor:
                             run.text = ''
                     else:
                         paragraph.text = text
+
+        # 2. Remplacer dans les tableaux qui se trouvent dans le bloc
+        # Trouver les tableaux entre start_idx et end_idx
+        if start_idx >= len(paragraphs) or end_idx >= len(paragraphs):
+            return
+
+        start_element = paragraphs[start_idx]._element
+        end_element = paragraphs[end_idx]._element
+
+        # Parcourir tous les tableaux du document
+        for table in self.doc.tables:
+            table_element = table._element
+
+            # Vérifier si le tableau est dans la plage du bloc
+            # (entre start_element et end_element dans le body)
+            is_in_range = self._is_element_in_range(table_element, start_element, end_element)
+
+            if is_in_range:
+                # Remplacer dans toutes les cellules du tableau
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            text = paragraph.text
+
+                            # Remplacer les placeholders
+                            for placeholder, value in replacements.items():
+                                text = text.replace(placeholder, str(value))
+
+                            # Mettre à jour le texte si modifié
+                            if text != paragraph.text:
+                                if paragraph.runs:
+                                    paragraph.runs[0].text = text
+                                    for run in paragraph.runs[1:]:
+                                        run.text = ''
+                                else:
+                                    paragraph.text = text
+
+    def _is_element_in_range(self, element, start_element, end_element):
+        """
+        Vérifie si un élément XML est entre start_element et end_element dans le body.
+
+        Args:
+            element: Élément à vérifier
+            start_element: Élément de début
+            end_element: Élément de fin
+
+        Returns:
+            True si l'élément est dans la plage, False sinon
+        """
+        body = self.doc.element.body
+        elements = list(body)
+
+        try:
+            start_pos = elements.index(start_element)
+            end_pos = elements.index(end_element)
+            element_pos = elements.index(element)
+
+            return start_pos <= element_pos <= end_pos
+        except ValueError:
+            # Un des éléments n'est pas dans le body
+            return False
 
 
 class BlockTemplate:

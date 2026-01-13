@@ -16,6 +16,7 @@ from src.calc_indicators import IndicatorCalculator
 from src.content_catalog import ContentCatalog
 from src.kpi_calculators import KPICalculator
 from src.word_renderer import WordRenderer
+from src.streamlit_charts_page import display_charts_page, init_chart_customization
 
 
 # Configuration de la page
@@ -46,6 +47,11 @@ def init_session_state():
         st.session_state.results_brut = None
     if 'results_net' not in st.session_state:
         st.session_state.results_net = None
+    if 'poste_labels' not in st.session_state:
+        st.session_state.poste_labels = {}
+
+    # Initialiser les personnalisations de graphiques
+    init_chart_customization()
 
 
 def load_excel_file(uploaded_file) -> bool:
@@ -109,6 +115,7 @@ def load_excel_file(uploaded_file) -> bool:
             st.session_state.emission_calc = emission_calc
             st.session_state.indicator_calc = indicator_calc
             st.session_state.content_catalog = content_catalog
+            st.session_state.poste_labels = emission_calc.poste_labels
             st.session_state.data_loaded = True
 
             # Calculer les résultats BRUT
@@ -499,7 +506,7 @@ def main():
             # Menu de navigation
             page = st.radio(
                 "Sections",
-                ["📊 Aperçu", "⚙️ Configuration", "💾 Export/Import", "📄 Génération"]
+                ["📊 Aperçu", "⚙️ Configuration", "🎨 Graphiques", "💾 Export/Import", "📄 Génération"]
             )
         else:
             page = None
@@ -513,6 +520,9 @@ def main():
 
     elif page == "⚙️ Configuration":
         display_overrides_ui()
+
+    elif page == "🎨 Graphiques":
+        display_charts_page()
 
     elif page == "💾 Export/Import":
         display_export_import()
