@@ -62,7 +62,7 @@ class ChartGenerator:
         plt.rcParams["mathtext.rm"] = "Poppins"
         plt.rcParams["mathtext.it"] = "Poppins:italic"
         plt.rcParams["mathtext.bf"] = "Poppins:bold"
-        self.title_font = fm.FontProperties(family="Poppins", weight="bold", size=12)
+        self.title_font = fm.FontProperties(family="Poppins", weight="bold", size=14)
         self.body_font = fm.FontProperties(family="Poppins", weight="normal")
 
     def generate_chart(self, chart_key: str, data: pd.DataFrame,
@@ -672,8 +672,6 @@ class ChartGenerator:
         # Ajouter le titre
         ax.set_title(
             'Répartition de l\'empreinte - Zoom sur les réactifs',
-            fontsize=16,
-            weight='bold',
             fontproperties=self.title_font,
             pad=20
         )

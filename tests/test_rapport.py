@@ -71,11 +71,11 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
     print("=" * 70)
     print()
 
-    # Définir le chemin de sortie
+    # Définir le chemin de sortie (sera mis à jour après construction de l'arbre)
     if output_path is None:
         output_dir = Path(__file__).parent / "output"
         output_dir.mkdir(exist_ok=True)
-        output_path = output_dir / "rapport_test.docx"
+        output_path = output_dir / "rapport_test.docx"  # Temporaire, sera mis à jour
     else:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -120,6 +120,12 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
         print(f"   Activités : {', '.join(sorted(tree.get_org_activities()))}")
         print("   ✅ Arborescence construite")
         print()
+
+        # Mettre à jour le nom du fichier de sortie avec le nom de l'organisation
+        if output_path.name == "rapport_test.docx":
+            import re
+            org_name_clean = re.sub(r'[^\w\s-]', '', org.node_name).strip().replace(' ', '_')
+            output_path = output_path.parent / f"Rapport Bilan Carbone {org_name_clean} {annee}.docx"
 
         # 3. CALCULS ÉMISSIONS
         print("📊 Étape 3/7 : Calcul des émissions...")

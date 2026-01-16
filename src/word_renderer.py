@@ -1092,7 +1092,7 @@ class WordRenderer:
 
             # Formater les KPI pour affichage (avec virgule française)
             kpi_m3_text = f"{kpi_m3_entity:.2f}".replace(".", ",") if kpi_m3_entity is not None else "N/A"
-            kpi_hab_text = f"{kpi_hab_entity:.2f}".replace(".", ",") if kpi_hab_entity is not None else "N/A"
+            kpi_hab_text = f"{int(round(kpi_hab_entity))}" if kpi_hab_entity is not None else "N/A"
 
             replacements = {
                 '{{ENT_ACTIVITY}}': activity_label,

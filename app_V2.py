@@ -455,6 +455,14 @@ def generate_report():
 
                 doc = renderer.render(context)
 
+                # Récupérer le nom de l'organisation (avec renommage si applicable)
+                org = st.session_state.tree.get_org()
+                org_name = overrides.get_node_name(org.node_id, org.node_name)
+
+                # Nettoyer le nom de l'organisation pour le nom de fichier (enlever caractères spéciaux)
+                import re
+                org_name_clean = re.sub(r'[^\w\s-]', '', org_name).strip().replace(' ', '_')
+
                 # Sauvegarder
                 output_path = Path("output/rapport_genere.docx")
                 output_path.parent.mkdir(exist_ok=True)
@@ -462,12 +470,12 @@ def generate_report():
 
                 st.success("✅ Rapport généré avec succès !")
 
-                # Proposer le téléchargement
+                # Proposer le téléchargement avec le nom formaté
                 with open(output_path, "rb") as f:
                     st.download_button(
                         label="📥 Télécharger le rapport",
                         data=f,
-                        file_name=f"rapport_carbone_{annee}.docx",
+                        file_name=f"Rapport Bilan Carbone {org_name_clean} {annee}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
 

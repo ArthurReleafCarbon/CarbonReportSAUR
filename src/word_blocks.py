@@ -73,6 +73,8 @@ class BlockProcessor:
     def duplicate_block(self, start_idx: int, end_idx: int, n_copies: int) -> List[Tuple[int, int]]:
         """
         Duplique un bloc n fois AVEC ses marqueurs START et END.
+        Cette méthode copie TOUS les éléments du body (paragraphes ET tableaux)
+        qui se trouvent entre start_idx et end_idx.
 
         Args:
             start_idx: Index du paragraphe START
@@ -84,21 +86,37 @@ class BlockProcessor:
         """
         paragraphs = list(self.doc.paragraphs)
 
-        # Extraire TOUS les éléments du bloc (START inclus, END inclus)
-        block_elements = []
-        for i in range(start_idx, end_idx + 1):
-            if i < len(paragraphs):
-                block_elements.append(paragraphs[i]._element)
+        # Récupérer les éléments de début et de fin
+        start_element = paragraphs[start_idx]._element
+        end_element = paragraphs[end_idx]._element
 
-        # Position d'insertion (après END_MARKER)
-        insert_after = paragraphs[end_idx]._element
+        # Accéder au body du document pour extraire TOUS les éléments (paragraphes ET tableaux)
+        body = self.doc.element.body
+        body_elements = list(body)
+
+        # Trouver les indices des éléments start et end dans le body
+        try:
+            start_pos = body_elements.index(start_element)
+            end_pos = body_elements.index(end_element)
+        except ValueError:
+            # Éléments non trouvés dans le body, fallback sur l'ancienne méthode
+            block_elements = []
+            for i in range(start_idx, end_idx + 1):
+                if i < len(paragraphs):
+                    block_elements.append(paragraphs[i]._element)
+            insert_after = paragraphs[end_idx]._element
+        else:
+            # Extraire TOUS les éléments du body entre start_pos et end_pos (inclus)
+            # Cela inclut les paragraphes (<w:p>) ET les tableaux (<w:tbl>)
+            block_elements = body_elements[start_pos:end_pos + 1]
+            insert_after = end_element
 
         # Dupliquer n fois
         copies_indices = []
         current_insert_after = insert_after
 
         for copy_num in range(n_copies):
-            # Copier chaque élément (y compris START et END)
+            # Copier chaque élément (y compris START, END, paragraphes et tableaux)
             for element in block_elements:
                 # Cloner l'élément
                 new_element = deepcopy(element)

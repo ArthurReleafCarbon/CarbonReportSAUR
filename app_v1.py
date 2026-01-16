@@ -106,6 +106,8 @@ def init_session_state():
         st.session_state.report_data = None
     if 'error_message' not in st.session_state:
         st.session_state.error_message = None
+    if 'org_name' not in st.session_state:
+        st.session_state.org_name = None
 
 
 def generate_report_v1(template_file, excel_file, annee: int = 2024):
@@ -147,6 +149,11 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
         tree_errors = tree.validate_structure()
         if tree_errors:
             raise ValueError(f"Erreurs dans l'arborescence : {', '.join(tree_errors)}")
+
+        # Stocker le nom de l'organisation dans session_state pour le nom du fichier
+        org = tree.get_org()
+        import streamlit as st
+        st.session_state.org_name = org.node_name
 
         # 4. Créer les calculateurs
         emission_calc = EmissionCalculator(
@@ -377,10 +384,15 @@ def main():
         )
 
         # Bouton de téléchargement
+        # Nettoyer le nom de l'organisation pour le nom de fichier
+        import re
+        org_name = st.session_state.org_name or "Organisation"
+        org_name_clean = re.sub(r'[^\w\s-]', '', org_name).strip().replace(' ', '_')
+
         st.download_button(
             label="📥 Télécharger le rapport",
             data=st.session_state.report_data,
-            file_name=f"rapport_carbone_{annee}.docx",
+            file_name=f"Rapport Bilan Carbone {org_name_clean} {annee}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
