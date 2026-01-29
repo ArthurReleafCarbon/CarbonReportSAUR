@@ -10,6 +10,7 @@ from typing import Dict, Optional
 
 # Imports des modules
 from src.excel_loader import ExcelLoader, ExcelValidationError
+from src.flat_loader import FlatLoader
 from src.tree import OrganizationTree
 from src.calc_emissions import EmissionCalculator, EmissionOverrides
 from src.calc_indicators import IndicatorCalculator
@@ -71,8 +72,12 @@ def load_excel_file(uploaded_file) -> bool:
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # Charger avec ExcelLoader
-            loader = ExcelLoader(str(temp_path))
+            # Auto-détection du format : simplifié (DATA) ou standard (9 onglets)
+            excel_file = pd.ExcelFile(str(temp_path))
+            if 'DATA' in excel_file.sheet_names:
+                loader = FlatLoader(str(temp_path))
+            else:
+                loader = ExcelLoader(str(temp_path))
             data = loader.load()
 
             # Récupérer warnings
