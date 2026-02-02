@@ -353,7 +353,7 @@ def main():
 
         excel_file = st.file_uploader(
             "",
-            type=['xlsx'],
+            type=['xlsx', 'xlsm'],
             key="excel_uploader",
             label_visibility="collapsed"
         )
