@@ -69,6 +69,12 @@ class WordRenderer:
         # 1. Remplacer les placeholders simples globaux
         self._replace_simple_placeholders(context)
 
+        # 1.1 Supprimer les lignes KPI m³ si l'activité correspondante est absente
+        if context.get('kpi_m3_eu') is None:
+            self._delete_paragraphs_containing('{{kpi_M3_EU}}')
+        if context.get('kpi_m3_aep') is None:
+            self._delete_paragraphs_containing('{{kpi_M3_AEP}}')
+
         # 1.5 Insérer le logo statique
         self._insert_static_logo()
 
@@ -140,18 +146,14 @@ class WordRenderer:
             replacements['{{TOTAL_EMISSIONS_S3}}'] = self.kpi_calc.format_number(org_result.scope3_tco2e)
             replacements['{{pourc_s3_org}}'] = self.kpi_calc.format_number(org_result.get_scope_percentage(3))
 
-        # KPI m³ - NOUVEAUX NOMS
+        # KPI m³ — remplacé si présent, sinon la ligne sera supprimée après
         kpi_m3_eu = context.get('kpi_m3_eu')
         kpi_m3_aep = context.get('kpi_m3_aep')
         if kpi_m3_eu is not None:
             replacements['{{kpi_M3_EU}}'] = f"{kpi_m3_eu:.2f} kgCO₂e/m³".replace(".", ",")
-        else:
-            replacements['{{kpi_M3_EU}}'] = "N/A"
 
         if kpi_m3_aep is not None:
             replacements['{{kpi_M3_AEP}}'] = f"{kpi_m3_aep:.2f} kgCO₂e/m³".replace(".", ",")
-        else:
-            replacements['{{kpi_M3_AEP}}'] = "N/A"
 
         # Équivalents - AVEC FORMAT ESPACE
         if org_result:
@@ -1186,20 +1188,24 @@ class WordRenderer:
 
             kpi_m3_entity = None
             kpi_hab_entity = None
+            kpi_branch_entity = None
 
             if indicator_result:
                 kpi_m3_entity = self.kpi_calc.calculate_kpi_m3_entity(result, indicator_result, activity)
                 kpi_hab_entity = self.kpi_calc.calculate_kpi_hab_entity(result, indicator_result)
+                kpi_branch_entity = self.kpi_calc.calculate_kpi_branch_entity(result, indicator_result)
 
             # Formater les KPI pour affichage (avec virgule française)
             kpi_m3_text = f"{kpi_m3_entity:.2f}".replace(".", ",") if kpi_m3_entity is not None else "N/A"
             kpi_hab_text = f"{int(round(kpi_hab_entity))}" if kpi_hab_entity is not None else "N/A"
+            kpi_branch_text = f"{kpi_branch_entity:.2f}".replace(".", ",") if kpi_branch_entity is not None else "N/A"
 
             replacements = {
                 '{{ENT_ACTIVITY}}': activity_label,
                 '{{ENTITY_TOP_POSTES_LIST}}': top_postes_list,
                 '{{kpi_m3_lot_act}}': kpi_m3_text,
-                '{{kpi_hab_lot_act}}': kpi_hab_text
+                '{{kpi_hab_lot_act}}': kpi_hab_text,
+                '{{kpi_branch_lot_act}}': kpi_branch_text,
             }
 
             processor.replace_in_block(block_start, block_end, replacements)
@@ -1654,6 +1660,12 @@ class WordRenderer:
         # Supprimer les paragraphes
         for paragraph in paragraphs_to_remove:
             self._delete_paragraph(paragraph)
+
+    def _delete_paragraphs_containing(self, placeholder: str):
+        """Supprime tous les paragraphes contenant le placeholder donné."""
+        for paragraph in list(self.doc.paragraphs):
+            if placeholder in paragraph.text:
+                self._delete_paragraph(paragraph)
 
     def _delete_paragraph(self, paragraph):
         """Supprime un paragraphe du document."""

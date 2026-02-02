@@ -252,6 +252,29 @@ class KPICalculator:
         kg_co2e = emission_result.total_tco2e * 1000
         return kg_co2e / hab_indicator.value
 
+    def calculate_kpi_branch_entity(self, emission_result: EmissionResult,
+                                     indicator_result: IndicatorResult) -> Optional[float]:
+        """
+        Calcule le KPI kgCO₂e/branchement pour une entité (LOT×ACTIVITÉ).
+
+        Args:
+            emission_result: Résultat d'émissions pour cette entité
+            indicator_result: Résultat d'indicateurs pour cette entité
+
+        Returns:
+            KPI en kgCO₂e/branchement ou None si pas de données
+        """
+        if not indicator_result:
+            return None
+
+        branch_indicator = indicator_result.get_indicator('NB_BRANCHEMENTS')
+
+        if not branch_indicator or branch_indicator.value == 0:
+            return None
+
+        kg_co2e = emission_result.total_tco2e * 1000
+        return kg_co2e / branch_indicator.value
+
     def format_kpi(self, value: Optional[float], unit: str, decimals: int = 2) -> str:
         """
         Formate un KPI pour affichage.

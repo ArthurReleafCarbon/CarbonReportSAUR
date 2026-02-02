@@ -265,34 +265,45 @@ class ChartGenerator:
             emission_result.scope3_tco2e
         ]
 
-        # Filtrer les scopes à 0
-        filtered_data = [(s, v) for s, v in zip(scopes, values) if v > 0]
-        if not filtered_data:
-            return None
-
-        scopes, values = zip(*filtered_data)
-
         # Couleurs pour les scopes (bleu clair, bleu moyen, bleu foncé)
         scope_colors = ['#89CFF0', '#5B9BD5', '#4472C4']
 
-        # Créer l'explode pour ajouter de l'espace entre les morceaux
-        explode = [0.05] * len(values)
+        # Garder tous les scopes pour la légende, mais ne tracer que ceux > 0
+        all_scopes = list(scopes)
+        all_values = list(values)
+
+        pie_indices = [i for i, v in enumerate(all_values) if v > 0]
+        if not pie_indices:
+            return None
+
+        pie_values = [all_values[i] for i in pie_indices]
+        pie_colors = [scope_colors[i] for i in pie_indices]
+        explode = [0.05] * len(pie_values)
 
         fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         wedges, texts, autotexts = ax.pie(
-            values,
+            pie_values,
             labels=None,
             autopct=self._pie_autopct,
             textprops=self._pie_textprops,
-            colors=scope_colors[:len(values)],
+            colors=pie_colors,
             startangle=90,
             explode=explode
         )
         for text in autotexts:
             text.set_color("white")
+
+        # Légende : inclure TOUS les scopes (même ceux à 0)
+        import matplotlib.patches as mpatches
+        legend_handles = [
+            mpatches.Patch(
+                color=scope_colors[i],
+                label=f'{all_scopes[i]} ({all_values[i]:,.0f} tCO₂e)'.replace(',', ' ')
+            )
+            for i in range(len(all_scopes))
+        ]
         ax.legend(
-            wedges,
-            scopes,
+            handles=legend_handles,
             loc='center left',
             bbox_to_anchor=(1.05, 0.5),
             frameon=False,
@@ -349,7 +360,7 @@ class ChartGenerator:
 
         # Utiliser le nom de l'organisation si disponible
         org_name = kwargs.get('org_name', 'ORG')
-        ax.set_title(f'Contribution des LOTs - {org_name}', fontproperties=self.title_font, pad=20)
+        ax.set_title('Contribution des lots du contrat', fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
         plt.tight_layout()
@@ -403,7 +414,7 @@ class ChartGenerator:
         explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
                textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
-        ax.set_title('Contribution des postes - ORG', fontproperties=self.title_font, pad=20)
+        ax.set_title("Contribution des postes sur l'ensemble du contrat", fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
         plt.tight_layout()
@@ -614,8 +625,10 @@ class ChartGenerator:
 
         fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         explode = [0.05] * len(values)
-        ax.pie(values, labels=labels, autopct=self._pie_autopct,
+        wedges, texts, autotexts = ax.pie(values, labels=labels, autopct=self._pie_autopct,
                textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
+        for autotext in autotexts:
+            autotext.set_color('white')
         title = title_override or f'Répartition par poste - {emission_result.node_name}'
         ax.set_title(title, fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
