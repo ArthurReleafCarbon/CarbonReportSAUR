@@ -84,7 +84,7 @@ def check_source_files():
 
     required_files = [
         'src/__init__.py',
-        'src/excel_loader.py',
+        'src/flat_loader.py',
         'src/tree.py',
         'src/calc_emissions.py',
         'src/calc_indicators.py',
@@ -94,7 +94,7 @@ def check_source_files():
         'src/kpi_calculators.py',
         'src/word_renderer.py',
         'src/word_blocks.py',
-        'app.py',
+        'app_v1.py',
         'requirements.txt'
     ]
 

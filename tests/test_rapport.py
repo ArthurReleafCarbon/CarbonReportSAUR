@@ -11,7 +11,6 @@ Le rapport généré sera dans : tests/output/rapport_test.docx
 
 import sys
 import os
-import pandas as pd
 from pathlib import Path
 
 # Ajouter le dossier parent au path pour importer les modules
@@ -19,8 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from docx import Document
 
-from src.excel_loader import ExcelLoader, ExcelValidationError
-from src.flat_loader import FlatLoader
+from src.flat_loader import FlatLoader, ExcelValidationError
 from src.tree import OrganizationTree
 from src.calc_emissions import EmissionCalculator, EmissionOverrides
 from src.calc_indicators import IndicatorCalculator
@@ -87,12 +85,7 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
         print("📥 Étape 1/7 : Chargement du fichier Excel...")
         print(f"   Fichier : {excel_path}")
 
-        # Auto-détection du format : simplifié (DATA) ou standard (9 onglets)
-        excel_file = pd.ExcelFile(excel_path)
-        if 'DATA' in excel_file.sheet_names:
-            loader = FlatLoader(excel_path)
-        else:
-            loader = ExcelLoader(excel_path)
+        loader = FlatLoader(excel_path)
         data = loader.load()
 
         errors, warnings = loader.get_validation_report()
@@ -143,8 +136,12 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
             data['POSTES_REF']
         )
 
-        # Calcul BRUT uniquement (pas d'overrides)
-        results_brut = emission_calc.calculate_brut(top_n=4)
+        # Calcul avec overrides auto (exclusion chauffage AEP si applicable)
+        auto_overrides = loader.get_auto_overrides()
+        if auto_overrides.poste_config:
+            results_brut = emission_calc.calculate_net(auto_overrides, top_n=4)
+        else:
+            results_brut = emission_calc.calculate_brut(top_n=4)
 
         org_result = results_brut.get('ORG')
         if org_result:
@@ -247,6 +244,11 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
             print(f"   → Placer votre template dans templates/rapport_template.docx")
             return False
 
+        # Calculer les données chauffage AEP
+        aep_with_chauffage = emission_calc.calculate_aep_with_chauffage()
+        chauffage_total = emission_calc.get_chauffage_total()
+        org_with_chauffage = emission_calc.calculate_org_with_chauffage()
+
         # Préparer le contexte
         context = {
             'annee': annee,
@@ -263,7 +265,12 @@ def test_generation_rapport(excel_path: str, output_path: str = None, annee: int
             'content_catalog': content_catalog,
             'emissions_l2_df': data.get('EMISSIONS_L2'),
             'emissions_df': data.get('EMISSIONS'),
-            'tree': tree
+            'tree': tree,
+            'aep_with_chauffage_result': aep_with_chauffage,
+            'chauffage_total_tco2e': chauffage_total,
+            'org_with_chauffage_result': org_with_chauffage,
+            'beges_df': data.get('BEGES'),
+            'emissions_evitees_df': data.get('EMISSIONS_EVITEES'),
         }
 
         # Générer le rapport

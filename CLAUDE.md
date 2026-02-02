@@ -10,7 +10,7 @@ Carbon Report Generator (SAUR) — a Streamlit application that generates carbon
 
 ```bash
 # Launch Streamlit application (latest version)
-streamlit run app_V2.py
+streamlit run app_v1.py
 
 # Quick test without Streamlit (BRUT mode only)
 python tests/test_rapport.py <excel_file.xlsx> <year>
@@ -22,13 +22,13 @@ python tests/unit/test_word_renderer_blocks.py
 python check_setup.py
 ```
 
-Note: `app_V2.py` is the current version. `app_v1.py` is a previous backup.
+Note: `app_v1.py` is the current and only version.
 
 ## Architecture
 
 ### Core Data Flow
 
-1. **Excel Loading** (`excel_loader.py`) — Validates and loads 9 required Excel sheets (see README.md for sheet schema)
+1. **Excel Loading** (`flat_loader.py`) — Validates and loads Excel (DATA sheet) into internal DataFrames
 2. **Tree Construction** (`tree.py`) — Builds hierarchical ORG→LOT→ENT structure with activity types
 3. **Emission Calculation** (`calc_emissions.py`) — Aggregates emissions at all levels, handles BRUT/NET modes
 4. **Indicator Calculation** (`calc_indicators.py`) — Computes indicators by LOT×ACTIVITY
@@ -91,12 +91,12 @@ Charts use matplotlib with custom Poppins fonts (loaded from `assets/police/`). 
 
 ## File Organization
 
-- `src/` — All Python modules (12 files)
+- `src/` — All Python modules (11 files)
 - `templates/` — Word template (`rapport_template.docx`)
 - `assets/` — Static images (logos, schemas, icons, fonts)
 - `output/` — Generated reports (Streamlit)
 - `tests/output/` — Test-generated reports
-- `app_V2.py` — Streamlit application entry point
+- `app_v1.py` — Streamlit application entry point
 
 ## Dependencies
 

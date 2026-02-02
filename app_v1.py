@@ -8,7 +8,7 @@ from pathlib import Path
 from io import BytesIO
 
 # Imports des modules
-from src.excel_loader import ExcelLoader, ExcelValidationError
+from src.flat_loader import FlatLoader, ExcelValidationError
 from src.tree import OrganizationTree
 from src.calc_emissions import EmissionCalculator, EmissionOverrides, EmissionResult
 from src.calc_indicators import IndicatorCalculator
@@ -134,7 +134,7 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
             f.write(template_file.getbuffer())
 
         # 2. Charger et valider l'Excel
-        loader = ExcelLoader(str(temp_excel_path))
+        loader = FlatLoader(str(temp_excel_path))
         data = loader.load()
 
         # Vérifier les warnings
@@ -170,8 +170,12 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
 
         content_catalog = ContentCatalog(data['TEXTE_RAPPORT'])
 
-        # 5. Calculer les résultats BRUT (sans modifications)
-        results_brut = emission_calc.calculate_brut(top_n=4)
+        # 5. Calculer les résultats (avec overrides auto)
+        auto_overrides = loader.get_auto_overrides()
+        if auto_overrides.poste_config:
+            results_brut = emission_calc.calculate_net(auto_overrides, top_n=4)
+        else:
+            results_brut = emission_calc.calculate_brut(top_n=4)
         indicator_results = indicator_calc.calculate()
 
         # 6. Calculer les KPI m³
@@ -225,7 +229,7 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
                 node_id='ORG',
                 node_name='ORG',
                 activity='AEP',
-                total_aep_tco2e=total_aep_tco2e,
+                total_tco2e=total_aep_tco2e,
                 scope1_tco2e=sum(r.scope1_tco2e for r in aep_results_list),
                 scope2_tco2e=sum(r.scope2_tco2e for r in aep_results_list),
                 scope3_tco2e=sum(r.scope3_tco2e for r in aep_results_list),
@@ -235,13 +239,27 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
             )
             kpi_m3_aep = kpi_calc.calculate_kpi_m3_aep(aep_total_result, aep_indicators_list)
 
-        # 7. Préparer le contexte pour le rendu
+        # 6b. Texte de comparaison volumes EU/AEP
+        eu_first_result = eu_results_list[0] if eu_results_list else None
+        aep_first_result = aep_results_list[0] if aep_results_list else None
+        eu_ind_first = eu_indicators_list[0] if eu_indicators_list else None
+        aep_ind_first = aep_indicators_list[0] if aep_indicators_list else None
+        activity_comparison = kpi_calc.generate_activity_volume_comparison_text(
+            eu_first_result, aep_first_result, eu_ind_first, aep_ind_first
+        )
+
+        # 7. Calculer les données chauffage AEP
+        aep_with_chauffage = emission_calc.calculate_aep_with_chauffage()
+        chauffage_total = emission_calc.get_chauffage_total()
+        org_with_chauffage = emission_calc.calculate_org_with_chauffage()
+
+        # 8. Préparer le contexte pour le rendu
         overrides = EmissionOverrides()  # Vide pour V1
 
         context = {
             'annee': annee,
             'org_result': results_brut.get('ORG'),
-            'lot_results': {k: v for k, v in results_brut.items() if k.startswith('LOT_')},
+            'lot_results': {k: v for k, v in results_brut.items() if k.startswith('LOT_') or k.startswith('ORG_')},
             'has_lots': tree.has_lots(),
             'poste_labels': emission_calc.poste_labels,
             'top_n': 4,
@@ -252,10 +270,16 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
             'tree': tree,
             'indicator_results': indicator_results,
             'kpi_m3_eu': kpi_m3_eu,
-            'kpi_m3_aep': kpi_m3_aep
+            'kpi_m3_aep': kpi_m3_aep,
+            'aep_with_chauffage_result': aep_with_chauffage,
+            'chauffage_total_tco2e': chauffage_total,
+            'org_with_chauffage_result': org_with_chauffage,
+            'beges_df': data.get('BEGES'),
+            'emissions_evitees_df': data.get('EMISSIONS_EVITEES'),
+            'activity_volume_comparison_text': activity_comparison,
         }
 
-        # 8. Générer le rapport Word
+        # 9. Générer le rapport Word
         renderer = WordRenderer(
             template_path=str(temp_template_path),
             assets_path="assets"
@@ -263,12 +287,12 @@ def generate_report_v1(template_file, excel_file, annee: int = 2024):
 
         doc = renderer.render(context)
 
-        # 9. Sauvegarder dans un BytesIO
+        # 10. Sauvegarder dans un BytesIO
         output_buffer = BytesIO()
         renderer.doc.save(output_buffer)
         output_buffer.seek(0)
 
-        # 10. Nettoyer les fichiers temporaires
+        # 11. Nettoyer les fichiers temporaires
         temp_excel_path.unlink(missing_ok=True)
         temp_template_path.unlink(missing_ok=True)
 

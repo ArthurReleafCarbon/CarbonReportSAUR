@@ -19,12 +19,20 @@ from .calc_emissions import EmissionResult
 class ChartGenerator:
     """Générateur de graphiques pour le rapport."""
 
+    # Tailles de figure centralisées (largeur, hauteur en inches)
+    FIGSIZE_PIE = (8, 6)        # Tous les camemberts (scope, postes, contribution, etc.)
+    FIGSIZE_BAR = (8, 6)        # Barres horizontales (travaux breakdown)
+    FIGSIZE_GROUPED_BAR = (8, 6)   # Barres groupées (inter-lot top3)
+    FIGSIZE_DONUT = (8, 6)      # Donuts (réactifs)
+    FIGSIZE_TABLE_WIDTH = 12.0  # Largeur du tableau BEGES (hauteur dynamique)
+    DPI = 150
+
     def __init__(self):
         """Initialise le générateur avec les styles par défaut."""
         # Style général
         plt.style.use('default')
         self.colors = ['#0B3B2E', '#3F9B83', '#62CC7B', '#8AD2C5', '#CDEFE8', '#E9F7F4']
-        self.dpi = 150
+        self.dpi = self.DPI
         self._load_fonts()
         plt.rcParams["axes.grid"] = False
         plt.rcParams["axes.facecolor"] = "white"
@@ -98,6 +106,8 @@ class ChartGenerator:
             return self.generate_scope_pie_entity(data, **kwargs)
         elif chart_key == 'chart_pie_postes_entity_activity':
             return self.generate_postes_pie_entity(data, **kwargs)
+        elif chart_key == 'BEGES_TABLE':
+            return self.generate_beges_table_image(data)
         else:
             # Key non supportée - retourner None gracieusement
             return None
@@ -115,7 +125,7 @@ class ChartGenerator:
         if data.empty:
             return None
 
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_BAR, dpi=self.dpi)
 
         # Bar chart horizontal
         y_pos = np.arange(len(data))
@@ -150,7 +160,7 @@ class ChartGenerator:
         if data.empty:
             return None
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
 
         # Pie chart avec légende à droite et pourcentages à l'extérieur
         colors = ['#2E86AB', '#A23B72', '#F18F01']
@@ -205,7 +215,7 @@ class ChartGenerator:
         if data.empty:
             return None
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
 
         # Pie chart (légende à droite, pas de labels autour du pie)
         explode = [0.05] * len(data)
@@ -268,7 +278,7 @@ class ChartGenerator:
         # Créer l'explode pour ajouter de l'espace entre les morceaux
         explode = [0.05] * len(values)
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         wedges, texts, autotexts = ax.pie(
             values,
             labels=None,
@@ -319,7 +329,7 @@ class ChartGenerator:
         names, values = zip(*lot_data)
 
         # Créer le pie chart avec les mêmes couleurs que les autres graphiques
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         explode = [0.05] * len(names)
 
         wedges, texts, autotexts = ax.pie(
@@ -389,7 +399,7 @@ class ChartGenerator:
             labels.append('Autres')
             values.append(sum(v for _, v in sorted_postes[5:]))
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
                textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
@@ -426,7 +436,7 @@ class ChartGenerator:
         labels = list(filtered.keys())
         values = list(filtered.values())
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         colors = ['#2E86AB', '#A23B72']
         explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
@@ -464,7 +474,7 @@ class ChartGenerator:
         labels = list(filtered.keys())
         values = list(filtered.values())
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
                textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
@@ -509,7 +519,7 @@ class ChartGenerator:
         x = np.arange(len(postes))
         width = 0.8 / len(lots)  # Largeur de chaque barre
 
-        fig, ax = plt.subplots(figsize=(12, 7), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_GROUPED_BAR, dpi=self.dpi)
 
         # Tracer une barre pour chaque LOT
         lot_colors = self.colors[:max(1, len(lots))]
@@ -564,13 +574,15 @@ class ChartGenerator:
         return self.generate_scope_pie(emission_result)
 
     def generate_postes_pie_entity(self, emission_result: EmissionResult,
-                                   poste_labels: dict = None, **kwargs) -> Optional[BytesIO]:
+                                   poste_labels: dict = None,
+                                   title_override: str = None, **kwargs) -> Optional[BytesIO]:
         """
         Camembert des postes pour LOT × ACTIVITÉ.
 
         Args:
             emission_result: Résultat d'émissions LOT×ACT
             poste_labels: Dictionnaire {code: label}
+            title_override: Titre personnalisé (remplace le titre par défaut)
 
         Returns:
             Image PNG en BytesIO
@@ -600,12 +612,12 @@ class ChartGenerator:
             labels.append('Autres')
             values.append(sum(v for _, v in sorted_postes[5:]))
 
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=self.dpi)
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_PIE, dpi=self.dpi)
         explode = [0.05] * len(values)
         ax.pie(values, labels=labels, autopct=self._pie_autopct,
                textprops=self._pie_textprops, colors=self.colors[:len(values)], startangle=90, explode=explode)
-        ax.set_title(f'Répartition par poste - {emission_result.node_name}',
-                     fontproperties=self.title_font, pad=20)
+        title = title_override or f'Répartition par poste - {emission_result.node_name}'
+        ax.set_title(title, fontproperties=self.title_font, pad=20)
         self._style_axes(ax)
 
         plt.tight_layout()
@@ -647,7 +659,7 @@ class ChartGenerator:
         percentages = grouped['percentage'].tolist()
 
         # Créer la figure
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=self.FIGSIZE_DONUT)
 
         # Palette de couleurs (inspirée de l'image)
         colors = ['#1b4d3e', '#2d8b6b', '#f4c542', '#e8a87c']
@@ -691,6 +703,294 @@ class ChartGenerator:
         # Sauvegarder dans un buffer
         img_buffer = BytesIO()
         plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight')
+        img_buffer.seek(0)
+        plt.close(fig)
+
+        return img_buffer
+
+    def generate_beges_table_image(self, beges_df: pd.DataFrame) -> Optional[BytesIO]:
+        """
+        Génère une image de tableau BEGES réglementaire.
+
+        Rendu matplotlib d'un tableau stylisé avec catégories colorées,
+        sous-totaux et total. Cohérent avec la charte graphique du rapport.
+
+        Args:
+            beges_df: DataFrame avec les colonnes de la feuille BEGES
+
+        Returns:
+            BytesIO contenant l'image PNG ou None si données vides
+        """
+        if beges_df is None or beges_df.empty:
+            return None
+
+        # Normaliser les noms de colonnes
+        df = beges_df.copy()
+        col_map = {}
+        for col in df.columns:
+            col_lower = col.strip().lower()
+            if 'catégorie' in col_lower or 'categorie' in col_lower:
+                col_map[col] = 'categorie'
+            elif 'numéro' in col_lower or 'numero' in col_lower:
+                col_map[col] = 'numero'
+            elif 'poste' in col_lower:
+                col_map[col] = 'poste'
+            elif 'co2' in col_lower:
+                col_map[col] = 'co2'
+        df = df.rename(columns=col_map)
+
+        # Filtrer les lignes entièrement vides
+        rows = []
+        for _, row in df.iterrows():
+            cat = row.get('categorie', '')
+            num = str(row.get('numero', '')).strip()
+            poste = row.get('poste', '')
+            co2 = row.get('co2', None)
+
+            # Transformer NaN en chaîne vide
+            if pd.isna(cat):
+                cat = ''
+            if pd.isna(num) or num == 'nan':
+                num = ''
+            if pd.isna(poste):
+                poste = ''
+            if pd.isna(co2):
+                co2_str = ''
+            else:
+                co2_str = f"{co2:,.1f}".replace(',', ' ')
+
+            # Sauter les lignes complètement vides
+            if not cat and not num and not poste and not co2_str:
+                continue
+
+            rows.append({
+                'categorie': str(cat).strip(),
+                'numero': num,
+                'poste': str(poste).strip(),
+                'co2': co2_str,
+            })
+
+        if not rows:
+            return None
+
+        # Couleurs
+        color_header = '#0B3B2E'
+        color_category = '#1A5C4A'
+        color_subtotal = '#D5D5D5'
+        color_total = '#0B3B2E'
+        color_row_even = '#F5F9F7'
+        color_row_odd = '#FFFFFF'
+        text_white = '#FFFFFF'
+        text_dark = '#1A1A1A'
+        color_border = '#CCCCCC'
+
+        # Dimensions
+        n_rows = len(rows) + 1  # +1 pour l'en-tête
+        row_height = 0.45
+        fig_height = n_rows * row_height + 1.0
+        fig_width = self.FIGSIZE_TABLE_WIDTH
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=self.dpi)
+        ax.set_xlim(0, fig_width)
+        ax.set_ylim(0, n_rows)
+        ax.axis('off')
+
+        # Largeurs de colonnes (proportions)
+        col_widths = [3.8, 1.0, 5.8, 1.4]  # categorie, numero, poste, co2
+        col_starts = [0]
+        for w in col_widths[:-1]:
+            col_starts.append(col_starts[-1] + w)
+
+        headers = ["Catégories d'émissions", "N°", "Postes d'émissions", "CO2 (t CO2e)"]
+
+        # Dessiner l'en-tête
+        y = n_rows - 1
+        ax.add_patch(plt.Rectangle((0, y), fig_width, 1,
+                                    facecolor=color_header, edgecolor='none'))
+        for j, header in enumerate(headers):
+            ha = 'right' if j == 3 else 'left'
+            x_pos = col_starts[j] + (col_widths[j] - 0.1 if j == 3 else 0.15)
+            ax.text(x_pos, y + 0.5, header, color=text_white,
+                    fontproperties=self.title_font, fontsize=9,
+                    ha=ha, va='center')
+
+        # Dessiner les lignes de données
+        for i, row_data in enumerate(rows):
+            y = n_rows - 2 - i
+            is_category = bool(row_data['categorie'])
+            is_subtotal = row_data['numero'].lower().startswith('sous')
+            is_total = row_data['numero'].upper() == 'TOTAL'
+
+            # Couleur de fond
+            if is_total:
+                bg_color = color_total
+                txt_color = text_white
+                font_weight = 'bold'
+                font_size = 9
+            elif is_category:
+                bg_color = color_category
+                txt_color = text_white
+                font_weight = 'bold'
+                font_size = 8.5
+            elif is_subtotal:
+                bg_color = color_subtotal
+                txt_color = text_dark
+                font_weight = 'bold'
+                font_size = 8.5
+            else:
+                bg_color = color_row_even if i % 2 == 0 else color_row_odd
+                txt_color = text_dark
+                font_weight = 'normal'
+                font_size = 8
+
+            # Rectangle de fond
+            ax.add_patch(plt.Rectangle((0, y), fig_width, 1,
+                                        facecolor=bg_color, edgecolor=color_border,
+                                        linewidth=0.5))
+
+            # Texte de chaque colonne
+            values = [row_data['categorie'], row_data['numero'],
+                      row_data['poste'], row_data['co2']]
+            for j, val in enumerate(values):
+                if not val:
+                    continue
+                ha = 'right' if j == 3 else 'left'
+                x_pos = col_starts[j] + (col_widths[j] - 0.15 if j == 3 else 0.15)
+                fp = fm.FontProperties(family="Poppins", weight=font_weight, size=font_size)
+                ax.text(x_pos, y + 0.5, val, color=txt_color,
+                        fontproperties=fp, ha=ha, va='center')
+
+        # Bordure extérieure
+        ax.add_patch(plt.Rectangle((0, 0), fig_width, n_rows,
+                                    facecolor='none', edgecolor=color_header,
+                                    linewidth=1.5))
+
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight',
+                    pad_inches=0.1)
+        img_buffer.seek(0)
+        plt.close(fig)
+
+        return img_buffer
+
+    def generate_evitees_table_image(self, evitees_df: pd.DataFrame) -> Optional[BytesIO]:
+        """
+        Génère une image de tableau des émissions évitées.
+
+        Agrège par typologie et affiche un tableau stylisé avec total.
+
+        Args:
+            evitees_df: DataFrame avec colonnes ['node_id', 'typologie', 'tco2e']
+
+        Returns:
+            BytesIO contenant l'image PNG ou None si données vides
+        """
+        if evitees_df is None or evitees_df.empty:
+            return None
+
+        # Agréger par typologie
+        grouped = evitees_df.groupby('typologie', sort=False)['tco2e'].sum().reset_index()
+        grouped = grouped.sort_values('tco2e', ascending=False)
+
+        if grouped.empty:
+            return None
+
+        total = grouped['tco2e'].sum()
+
+        # Préparer les lignes : données + total
+        rows = []
+        for _, row in grouped.iterrows():
+            typ = str(row['typologie']).strip() if pd.notna(row['typologie']) else ''
+            tco2e_val = row['tco2e']
+            rows.append({
+                'typologie': typ,
+                'tco2e': f"{tco2e_val:,.1f}".replace(',', ' '),
+                'is_total': False,
+            })
+        rows.append({
+            'typologie': 'Total émissions évitées',
+            'tco2e': f"{total:,.1f}".replace(',', ' '),
+            'is_total': True,
+        })
+
+        # Couleurs (même charte que BEGES)
+        color_header = '#0B3B2E'
+        color_total = '#0B3B2E'
+        color_row_even = '#F5F9F7'
+        color_row_odd = '#FFFFFF'
+        text_white = '#FFFFFF'
+        text_dark = '#1A1A1A'
+        color_border = '#CCCCCC'
+
+        # Dimensions
+        n_rows = len(rows) + 1  # +1 pour l'en-tête
+        row_height = 0.45
+        fig_height = n_rows * row_height + 1.0
+        fig_width = 8.0  # Plus étroit que BEGES (2 colonnes seulement)
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=self.dpi)
+        ax.set_xlim(0, fig_width)
+        ax.set_ylim(0, n_rows)
+        ax.axis('off')
+
+        # Largeurs de colonnes
+        col_widths = [5.8, 2.2]  # typologie, tco2e
+        col_starts = [0, col_widths[0]]
+
+        headers = ["Typologie", "tCO₂e évitées"]
+
+        # Dessiner l'en-tête
+        y = n_rows - 1
+        ax.add_patch(plt.Rectangle((0, y), fig_width, 1,
+                                    facecolor=color_header, edgecolor='none'))
+        for j, header in enumerate(headers):
+            ha = 'right' if j == 1 else 'left'
+            x_pos = col_starts[j] + (col_widths[j] - 0.15 if j == 1 else 0.15)
+            ax.text(x_pos, y + 0.5, header, color=text_white,
+                    fontproperties=self.title_font, fontsize=9,
+                    ha=ha, va='center')
+
+        # Dessiner les lignes de données
+        for i, row_data in enumerate(rows):
+            y = n_rows - 2 - i
+
+            if row_data['is_total']:
+                bg_color = color_total
+                txt_color = text_white
+                font_weight = 'bold'
+                font_size = 9
+            else:
+                bg_color = color_row_even if i % 2 == 0 else color_row_odd
+                txt_color = text_dark
+                font_weight = 'normal'
+                font_size = 8.5
+
+            ax.add_patch(plt.Rectangle((0, y), fig_width, 1,
+                                        facecolor=bg_color, edgecolor=color_border,
+                                        linewidth=0.5))
+
+            values = [row_data['typologie'], row_data['tco2e']]
+            for j, val in enumerate(values):
+                if not val:
+                    continue
+                ha = 'right' if j == 1 else 'left'
+                x_pos = col_starts[j] + (col_widths[j] - 0.15 if j == 1 else 0.15)
+                fp = fm.FontProperties(family="Poppins", weight=font_weight, size=font_size)
+                ax.text(x_pos, y + 0.5, val, color=txt_color,
+                        fontproperties=fp, ha=ha, va='center')
+
+        # Bordure extérieure
+        ax.add_patch(plt.Rectangle((0, 0), fig_width, n_rows,
+                                    facecolor='none', edgecolor=color_header,
+                                    linewidth=1.5))
+
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=self.dpi, bbox_inches='tight',
+                    pad_inches=0.1)
         img_buffer.seek(0)
         plt.close(fig)
 

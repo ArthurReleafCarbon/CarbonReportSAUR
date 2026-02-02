@@ -312,3 +312,50 @@ class EmissionCalculator:
         # Agréger par poste_l2
         aggregated = l2_data.groupby('poste_l2')['tco2e'].sum().reset_index()
         return aggregated.sort_values('tco2e', ascending=False)
+
+    def calculate_aep_with_chauffage(self, top_n: int = 4) -> Optional[EmissionResult]:
+        """
+        Calcule les émissions AEP agrégées sur tous les LOTs,
+        en INCLUANT le poste chauffage (exclu des calculs standards).
+        Retourne None si aucune entité AEP.
+        """
+        org = self.tree.get_org()
+        aep_ents = self.tree.get_ents_by_activity(org.node_id, 'AEP')
+        aep_ent_ids = [n.node_id for n in aep_ents]
+        if not aep_ent_ids:
+            return None
+        # Calcul sans overrides = tout inclus (y compris chauffage)
+        return self._aggregate_emissions(
+            node_id='ORG_AEP_CHAUFFAGE',
+            node_name='AEP - avec chauffage',
+            ent_ids=aep_ent_ids,
+            activity='AEP',
+            overrides=EmissionOverrides(),
+            top_n=top_n
+        )
+
+    def calculate_org_with_chauffage(self, top_n: int = 4) -> Optional[EmissionResult]:
+        """
+        Calcule les émissions ORG globales (toutes entités, toutes activités),
+        en INCLUANT le poste chauffage (potentiellement exclu par les overrides).
+        Retourne None si aucune entité AEP (section inutile sans AEP).
+        """
+        org = self.tree.get_org()
+        aep_ents = self.tree.get_ents_by_activity(org.node_id, 'AEP')
+        if not aep_ents:
+            return None
+        # Calcul ORG sans overrides = tout inclus (y compris chauffage)
+        return self._calculate_org(EmissionOverrides(), top_n)
+
+    def get_chauffage_total(self, chauffage_poste_code: str = 'P_CHAUFFAGE_DE_L_EAU') -> float:
+        """Retourne le total tCO2e du poste chauffage sur toutes les entités AEP."""
+        org = self.tree.get_org()
+        aep_ents = self.tree.get_ents_by_activity(org.node_id, 'AEP')
+        aep_ent_ids = [n.node_id for n in aep_ents]
+        if not aep_ent_ids:
+            return 0.0
+        mask = (
+            self.emissions_df['node_id'].isin(aep_ent_ids)
+            & (self.emissions_df['poste_l1_code'] == chauffage_poste_code)
+        )
+        return self.emissions_df[mask]['tco2e'].sum()

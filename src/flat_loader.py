@@ -9,7 +9,25 @@ import pandas as pd
 from typing import Dict, List, Optional, Tuple, Set
 from pathlib import Path
 
-from src.excel_loader import ExcelValidationError
+class ExcelValidationError(Exception):
+    """Exception levée lors d'erreurs de validation du fichier Excel."""
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Schéma de sortie attendu (colonnes par DataFrame)
+# ---------------------------------------------------------------------------
+REQUIRED_SHEETS = {
+    'ORG_TREE': ['node_id', 'parent_id', 'node_type', 'node_name', 'activity'],
+    'EMISSIONS': ['node_id', 'scope', 'poste_l1_code', 'tco2e', 'comment'],
+    'EMISSIONS_L2': ['node_id', 'poste_l1_code', 'poste_l2', 'tco2e'],
+    'POSTES_L2_REF': ['poste_l1_code', 'poste_l2', 'poste_l2_order'],
+    'POSTES_REF': ['poste_l1_code', 'poste_l1_label', 'commentaire'],
+    'INDICATORS': ['node_id', 'activity', 'indicator_code', 'value', 'unit', 'comment'],
+    'INDICATORS_REF': ['indicator_code', 'indicator_label', 'default_unit', 'activity_scope', 'display_order'],
+    'EMISSIONS_EVITEES': ['node_id', 'typologie', 'tco2e'],
+    'TEXTE_RAPPORT': ['poste_l1_code', 'value', 'icone', 'CHART_KEY', 'IMAGE_KEY', 'TABLE_KEY', 'activity', 'DETAIL_SOUCE'],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +63,7 @@ SCOPE_BY_CATEGORY = {
     'Déplacements pro': 3,
     'Déchets': 3,
     'Fret sortant': 1,
+    "Chauffage de l'eau": 3,
 }
 
 # ---------------------------------------------------------------------------
@@ -66,6 +85,7 @@ L1_LABEL_MAP = {
     'Déplacements pro': 'Parc automobile',
     'Déchets': 'Déchets',
     'Fret sortant': 'Fret sortant',
+    "Chauffage de l'eau": "Chauffage de l'eau par le client",
 }
 
 # ---------------------------------------------------------------------------
@@ -80,6 +100,19 @@ INDICATOR_CODE_MAP = {
     "nombre de branchements": 'NB_BRANCHEMENTS',
     "nombre d'habitants": 'NB_HAB_DESSERVIS',
 }
+
+
+# ---------------------------------------------------------------------------
+# Postes exclus automatiquement des totaux
+# Le poste "Chauffage de l'eau" (AEP) est exclu des totaux mais présenté
+# dans une section dédiée du rapport.
+# ---------------------------------------------------------------------------
+AUTO_EXCLUDE_FROM_TOTALS = {
+    "P_CHAUFFAGE_DE_L_EAU": ["AEP"],
+}
+
+# Code du poste chauffage (utilisé par calc_emissions et word_renderer)
+CHAUFFAGE_POSTE_CODE = "P_CHAUFFAGE_DE_L_EAU"
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +212,11 @@ class FlatLoader:
                 excel_file, emission_categories
             )
 
-            # 7. Validation finale des schemas
+            # 7. Charger BEGES si présent
+            if 'BEGES' in excel_file.sheet_names:
+                self.data['BEGES'] = pd.read_excel(excel_file, sheet_name='BEGES')
+
+            # 8. Validation finale des schemas
             self._validate_output_schemas()
 
             if self.validation_errors:
@@ -197,6 +234,25 @@ class FlatLoader:
     def get_validation_report(self) -> Tuple[List[str], List[str]]:
         """Retourne les erreurs et warnings de validation."""
         return self.validation_errors, self.validation_warnings
+
+    def get_auto_overrides(self):
+        """Retourne les overrides automatiques (ex: exclusion chauffage AEP des totaux).
+
+        Doit être appelé après load().
+        """
+        from src.calc_emissions import EmissionOverrides
+        overrides = EmissionOverrides()
+        if 'EMISSIONS' not in self.data:
+            return overrides
+        existing_codes = set(self.data['EMISSIONS']['poste_l1_code'].unique())
+        for poste_code in AUTO_EXCLUDE_FROM_TOTALS:
+            if poste_code in existing_codes:
+                overrides.set_poste_config(
+                    poste_code,
+                    show_in_report=False,
+                    include_in_totals=False
+                )
+        return overrides
 
     # ------------------------------------------------------------------
     # Validation
@@ -217,7 +273,6 @@ class FlatLoader:
 
     def _validate_output_schemas(self) -> None:
         """Vérifie que chaque DataFrame de sortie a les colonnes attendues."""
-        from src.excel_loader import REQUIRED_SHEETS
         for sheet_name, required_cols in REQUIRED_SHEETS.items():
             if sheet_name in self.data:
                 df = self.data[sheet_name]

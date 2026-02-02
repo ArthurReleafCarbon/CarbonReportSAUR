@@ -27,6 +27,10 @@ class WordRenderer:
     Remplace les placeholders, duplique les blocs, insère images/tableaux.
     """
 
+    # Largeurs d'insertion des images (en inches)
+    IMAGE_WIDTH_CHART = 5.0       # Graphiques standard (pie, bar, etc.)
+    IMAGE_WIDTH_FULL = 6.5        # Tableaux pleine largeur (BEGES, etc.)
+
     def __init__(self, template_path: str, assets_path: str):
         """
         Initialise le renderer.
@@ -71,11 +75,20 @@ class WordRenderer:
         # 2. Dupliquer et remplir les blocs LOT
         self._process_lot_blocks(context)
 
-        # 2.5 Nettoyer tous les marqueurs de blocs
+        # 2.5 Traiter la section chauffage inclus (émissions globales ORG)
+        self._process_chauffage_inclus_section(context)
+
+        # 2.5c Traiter la section émissions évitées
+        self._process_evitees_section(context)
+
+        # 2.6 Nettoyer tous les marqueurs de blocs
         self._clean_all_markers()
 
         # 3. Insérer les graphiques ORG
         self._insert_org_charts(context)
+
+        # 3.5 Insérer l'annexe BEGES
+        self._insert_beges_annex(context)
 
         # 4. Nettoyer les placeholders vides
         self._clean_empty_placeholders()
@@ -941,6 +954,94 @@ class WordRenderer:
         except Exception:
             return
 
+    def _process_chauffage_inclus_section(self, context: Dict[str, Any]):
+        """
+        Traite le bloc [[START_CHAUFFAGE_INCLUS]]...[[END_CHAUFFAGE_INCLUS]].
+        Section unique chauffage : émissions globales ORG avec chauffage de l'eau
+        par le client final inclus. Supprimé si aucune entité AEP.
+
+        Placeholders :
+            {{CHAUFFAGE_TOTAL}} — total chauffage en tCO₂e
+            {{CHAUFFAGE_PERCENTAGE}} — % du chauffage par rapport au total AEP
+            {{PIE_CHART_CHAUFFAGE_INCLU}} — camembert ORG chauffage inclus
+        """
+        from .word_blocks import BlockProcessor
+
+        processor = BlockProcessor(self.doc)
+        block_info = processor.find_block('[[START_CHAUFFAGE_INCLUS]]', '[[END_CHAUFFAGE_INCLUS]]')
+
+        if not block_info:
+            return
+
+        start_idx, end_idx = block_info
+
+        org_chauffage_result = context.get('org_with_chauffage_result')
+
+        if not org_chauffage_result:
+            self._delete_block(start_idx, end_idx)
+            return
+
+        # Remplacer les placeholders texte (chauffage total + pourcentage AEP)
+        chauffage_total = context.get('chauffage_total_tco2e', 0.0)
+        aep_result = context.get('aep_with_chauffage_result')
+
+        if aep_result and aep_result.total_tco2e > 0 and chauffage_total > 0:
+            percentage = (chauffage_total / aep_result.total_tco2e) * 100
+        else:
+            percentage = 0.0
+
+        replacements = {
+            '{{CHAUFFAGE_TOTAL}}': self.kpi_calc.format_number(chauffage_total),
+            '{{CHAUFFAGE_PERCENTAGE}}': f'{percentage:.1f} %',
+        }
+        processor.replace_in_block(start_idx, end_idx, replacements)
+
+        # Générer et insérer le camembert (répartition postes ORG chauffage inclus)
+        poste_labels = context.get('poste_labels', {})
+        chart_buffer = self.chart_gen.generate_postes_pie_entity(
+            org_chauffage_result,
+            poste_labels=poste_labels,
+            title_override='Répartition des postes - chauffage inclus'
+        )
+        if chart_buffer:
+            self._insert_image('{{PIE_CHART_CHAUFFAGE_INCLU}}', chart_buffer)
+
+    def _process_evitees_section(self, context: Dict[str, Any]):
+        """
+        Traite le bloc [[START_EVITEES]]...[[END_EVITEES]].
+        Affiche les émissions évitées sous forme de tableau.
+        Si aucune donnée, le bloc est supprimé.
+        """
+        from .word_blocks import BlockProcessor
+
+        processor = BlockProcessor(self.doc)
+        block_info = processor.find_block('[[START_EVITEES]]', '[[END_EVITEES]]')
+
+        if not block_info:
+            return
+
+        start_idx, end_idx = block_info
+
+        evitees_df = context.get('emissions_evitees_df')
+
+        if evitees_df is None or evitees_df.empty:
+            self._delete_block(start_idx, end_idx)
+            return
+
+        # Calculer le total
+        total = evitees_df['tco2e'].sum()
+
+        # Remplacer les placeholders texte
+        replacements = {
+            '{{EVITEES_TOTAL}}': self.kpi_calc.format_number(total),
+        }
+        processor.replace_in_block(start_idx, end_idx, replacements)
+
+        # Générer et insérer le tableau image
+        chart_buffer = self.chart_gen.generate_evitees_table_image(evitees_df)
+        if chart_buffer:
+            self._insert_image('{{EVITEES_TABLE}}', chart_buffer)
+
     def _delete_block(self, start_idx: int, end_idx: int):
         """
         Supprime un bloc complet (y compris les marqueurs).
@@ -1287,6 +1388,8 @@ class WordRenderer:
         processor.remove_block_markers('[[START_POST]]', '[[END_POST]]')
         processor.remove_block_markers('[[START_ACTIVITY]]', '[[END_ACTIVITY]]')
         processor.remove_block_markers('[[START_LOT]]', '[[END_LOT]]')
+        processor.remove_block_markers('[[START_CHAUFFAGE_INCLUS]]', '[[END_CHAUFFAGE_INCLUS]]')
+        processor.remove_block_markers('[[START_EVITEES]]', '[[END_EVITEES]]')
 
     def _insert_org_charts(self, context: Dict[str, Any]):
         """
@@ -1463,6 +1566,42 @@ class WordRenderer:
 
         # Insérer l'image dans la zone spécifiée
         self._insert_image_in_range(placeholder, img_buffer, start_idx, end_idx, width=width, height=height)
+
+    def _insert_beges_annex(self, context: Dict[str, Any]):
+        """
+        Insère l'image du tableau BEGES dans la section Annexes.
+
+        Cherche le placeholder {{chart_beges_table}} dans le document.
+        Si absent, ajoute l'image en fin de document.
+
+        Args:
+            context: Contexte global contenant beges_df
+        """
+        beges_df = context.get('beges_df')
+        if beges_df is None:
+            return
+
+        img_buffer = self.chart_gen.generate_beges_table_image(beges_df)
+        if not img_buffer:
+            return
+
+        # Chercher le placeholder dans le document
+        placeholder = '{{chart_beges_table}}'
+        found = False
+        for paragraph in self.doc.paragraphs:
+            if placeholder in paragraph.text:
+                found = True
+                paragraph.clear()
+                run = paragraph.add_run()
+                run.add_picture(img_buffer, width=Inches(self.IMAGE_WIDTH_FULL))
+                break
+
+        if not found:
+            # Fallback : ajouter en fin de document
+            self.doc.add_paragraph()  # espace
+            p = self.doc.add_paragraph()
+            run = p.add_run()
+            run.add_picture(img_buffer, width=Inches(self.IMAGE_WIDTH_FULL))
 
     def _insert_image(self, placeholder: str, img_buffer: BytesIO,
                       width: Optional[float] = 5.0, height: Optional[float] = None):
